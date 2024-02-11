@@ -14,6 +14,7 @@ TEST_CASE("Test monadic operations on std::optional")
     using sib::monad::flatten;
     using sib::monad::when_any;
     using sib::monad::operator^;
+    using sib::monad::then;
 
     std::optional<int> opt = 42;
     std::optional<int> const copt = 27;
@@ -56,4 +57,22 @@ TEST_CASE("Test monadic operations on std::optional")
         CHECK((empty ^ opt) == opt);
         CHECK(((copt ^ empty) | get) == 27);
     }
+
+    SECTION("optional | then")
+    {
+        // then always returns by value, even if the callable returns a reference
+        auto const g = [](int& x) -> int& { return x; };
+        int i = 0;
+        static_assert(std::is_same_v<decltype(then(g)(i)), int>);
+
+        auto const f = [](auto const x){ return x + x; };
+        static_assert(std::is_same_v<decltype(opt | then(f)), std::optional<int>>);
+        static_assert(std::is_same_v<decltype(copt | then(f)), std::optional<int>>);
+        static_assert(std::is_same_v<decltype(std::move(opt) | then(f)), std::optional<int>>);
+        static_assert(std::is_same_v<decltype(std::move(copt) | then(f)), std::optional<int>>);
+
+        CHECK((copt | then(f) | get) == 54);
+        CHECK((empty | then(f)) == empty);
+    }
+
 }
