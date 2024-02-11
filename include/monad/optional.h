@@ -47,17 +47,39 @@ std::optional<T> operator|(std::optional<std::optional<T>> opt, Flatten)
 }
 
 template<typename T>
-std::optional<T> when_any(std::initializer_list<std::optional<T>> list)
+std::optional<T> operator^(std::optional<T> const& lhs, std::optional<T> const& rhs)
 {
-    auto const it = std::find_if(std::begin(list), std::end(list),
-                                 [](auto const &opt){ return opt.has_value(); });
-    return it == std::end(list) ? std::optional<T>{} : std::move(*it);
+    return lhs ? lhs : rhs;
+}
+
+template<typename T>
+std::optional<T> operator^(std::optional<T>&& lhs, std::optional<T> const& rhs)
+{
+    return lhs ? std::move(lhs) : rhs;
+}
+
+template<typename T>
+std::optional<T> operator^(std::optional<T> const& lhs, std::optional<T>&& rhs)
+{
+    return lhs ? lhs : std::move(rhs);
+}
+
+template<typename T>
+std::optional<T> operator^(std::optional<T>&& lhs, std::optional<T>&& rhs)
+{
+    return lhs ? std::move(lhs) : std::move(rhs);
 }
 
 template<typename T, typename... Tail>
-std::optional<T> when_any(std::optional<T> head, Tail&&... tail)
+std::optional<T> when_any(std::optional<T> const& head, Tail&&... tail)
 {
-    return when_any({std::move(head), std::forward<Tail>(tail)...});
+    return (std::move(head) ^ ... ^ tail);
+}
+
+template<typename T, typename... Tail>
+std::optional<T> when_any(std::optional<T>&& head, Tail&&... tail)
+{
+    return (std::move(head) ^ ... ^ tail);
 }
 
 }

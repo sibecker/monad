@@ -13,6 +13,7 @@ TEST_CASE("Test monadic operations on std::optional")
     using sib::monad::get;
     using sib::monad::flatten;
     using sib::monad::when_any;
+    using sib::monad::operator^;
 
     std::optional<int> opt = 42;
     std::optional<int> const copt = 27;
@@ -48,8 +49,11 @@ TEST_CASE("Test monadic operations on std::optional")
 
     SECTION("when_any(optional...)")
     {
-        CHECK(when_any(empty, opt, copt) == opt);
-        CHECK(when_any(empty) == empty);
-        CHECK(when_any({copt, empty}) == copt);
+        CHECK(when_any(empty, opt, copt) != empty);
+        CHECK(when_any(empty, empty) == empty);
+
+        // ^ is shorthand for when_any
+        CHECK((empty ^ opt) == opt);
+        CHECK(((copt ^ empty) | get) == 27);
     }
 }
