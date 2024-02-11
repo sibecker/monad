@@ -46,4 +46,18 @@ std::optional<T> operator|(std::optional<std::optional<T>> opt, Flatten)
     return std::move(opt).value_or(std::nullopt);
 }
 
+template<typename T>
+std::optional<T> when_any(std::initializer_list<std::optional<T>> list)
+{
+    auto const it = std::find_if(std::begin(list), std::end(list),
+                                 [](auto const &opt){ return opt.has_value(); });
+    return it == std::end(list) ? std::optional<T>{} : std::move(*it);
+}
+
+template<typename T, typename... Tail>
+std::optional<T> when_any(std::optional<T> head, Tail&&... tail)
+{
+    return when_any({std::move(head), std::forward<Tail>(tail)...});
+}
+
 }
