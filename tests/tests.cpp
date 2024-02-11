@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "monad/optional.h"
+#include <functional>
 
 TEST_CASE("Test monadic operations on std::optional")
 {
@@ -15,10 +16,14 @@ TEST_CASE("Test monadic operations on std::optional")
     using sib::monad::when_any;
     using sib::monad::operator^;
     using sib::monad::then;
+    using sib::monad::when_all;
+    using sib::monad::operator&;
+    using sib::monad::apply;
 
     std::optional<int> opt = 42;
     std::optional<int> const copt = 27;
     std::optional<int> const empty = std::nullopt;
+    auto const f = [](auto const x){ return x + x; };
 
     SECTION("optional | get")
     {
@@ -53,7 +58,7 @@ TEST_CASE("Test monadic operations on std::optional")
         CHECK(when_any(empty, opt, copt) != empty);
         CHECK(when_any(empty, empty) == empty);
 
-        // ^ is shorthand for when_any
+        // operator^ is shorthand for when_any
         CHECK((empty ^ opt) == opt);
         CHECK(((copt ^ empty) | get) == 27);
     }
@@ -65,7 +70,6 @@ TEST_CASE("Test monadic operations on std::optional")
         int i = 0;
         static_assert(std::is_same_v<decltype(then(g)(i)), int>);
 
-        auto const f = [](auto const x){ return x + x; };
         static_assert(std::is_same_v<decltype(opt | then(f)), std::optional<int>>);
         static_assert(std::is_same_v<decltype(copt | then(f)), std::optional<int>>);
         static_assert(std::is_same_v<decltype(std::move(opt) | then(f)), std::optional<int>>);
@@ -73,6 +77,20 @@ TEST_CASE("Test monadic operations on std::optional")
 
         CHECK((copt | then(f) | get) == 54);
         CHECK((empty | then(f)) == empty);
+    }
+
+    SECTION("when_all(optional, optional) | apply")
+    {
+        CHECK((when_all(opt, copt) | apply(std::plus<>{}) | get) == 69);
+
+        // operator& is shorthand for when_all
+        CHECK(((opt & copt) | apply(std::plus<>{}) | get) == 69);
+    }
+
+    SECTION("(((opt ^ empty) | then(f)) & copt) | apply(minus)")
+    {
+        // A complex expression using all the (public) monadic operations
+        CHECK((((opt ^ empty) | then(f)) & copt) | apply(std::minus<>{}) | get) == 57);
     }
 
 }
