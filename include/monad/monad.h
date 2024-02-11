@@ -8,5 +8,6 @@
 namespace sib::monad {
 
 static inline constexpr class Get {} get;
+static inline constexpr class Flatten {} flatten;
 
 }

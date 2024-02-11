@@ -34,4 +34,16 @@ T const&& operator|(std::optional<T> const&& opt, Get)
     return std::move(opt).value();
 }
 
+template<typename T>
+std::optional<T> operator|(std::optional<T> opt, Flatten)
+{
+    return std::move(opt);
+}
+
+template<typename T>
+std::optional<T> operator|(std::optional<std::optional<T>> opt, Flatten)
+{
+    return std::move(opt).value_or(std::nullopt);
+}
+
 }
