@@ -9,5 +9,4 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 
 enable_testing()
 add_subdirectory(include)
-add_subdirectory(src)
 add_subdirectory(tests)

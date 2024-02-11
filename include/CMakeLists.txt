@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.12)
 
-project(example-headers)
+project(monad)
 
-add_library(example-headers INTERFACE
-        example.h)
-target_include_directories(example-headers INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-
+add_library(monad INTERFACE
+        monad/monad.h
+        monad/optional.h
+)
+target_include_directories(monad INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})

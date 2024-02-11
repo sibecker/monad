@@ -4,7 +4,7 @@ add_subdirectory(Catch2)
 
 add_executable(tests tests.cpp)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
-target_link_libraries(tests PUBLIC example)
+target_link_libraries(tests PUBLIC monad)
 
 include(CTest)
 include(Catch)
