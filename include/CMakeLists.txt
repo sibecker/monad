@@ -5,5 +5,6 @@ project(monad)
 add_library(monad INTERFACE
         monad/monad.h
         monad/optional.h
+        monad/function.h
 )
 target_include_directories(monad INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})

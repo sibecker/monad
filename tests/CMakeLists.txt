@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.12)
 
 add_subdirectory(Catch2)
 
-add_executable(tests tests.cpp)
+add_executable(tests
+        optional.cpp
+        function.cpp
+)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(tests PUBLIC monad)
 

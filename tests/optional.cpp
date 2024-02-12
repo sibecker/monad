@@ -90,7 +90,7 @@ TEST_CASE("Test monadic operations on std::optional")
     SECTION("(((opt ^ empty) | then(f)) & copt) | apply(minus)")
     {
         // A complex expression using all the (public) monadic operations
-        CHECK((((opt ^ empty) | then(f)) & copt) | apply(std::minus<>{}) | get) == 57);
+        CHECK(((((opt ^ empty) | then(f)) & copt) | apply(std::minus<>{}) | get) == 57);
     }
 
 }
