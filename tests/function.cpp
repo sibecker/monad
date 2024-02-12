@@ -47,4 +47,9 @@ TEST_CASE("Test monadic operations on std::function")
         auto const hobsons_choice = hello ^ hello ^ hello ^ hello;
         CHECK(hobsons_choice() == "Hello"s);
     }
+
+    SECTION("function | then")
+    {
+        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get) == "Hello, World!");
+    }
 }

@@ -34,4 +34,12 @@ namespace sib::monad {
     {
         return std::move(lhs);
     }
+
+    template<typename R, typename... Args, typename Invokable>
+    auto operator|(std::function<R(Args...)> function, Then<Invokable> then) -> std::function<std::invoke_result_t<Invokable, R>(Args...)>
+    {
+        return [function = std::move(function), then = std::move(then)](Args... args){
+            return std::move(then)(function(std::move(args)...));
+        };
+    }
 }
