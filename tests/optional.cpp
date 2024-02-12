@@ -27,11 +27,11 @@ TEST_CASE("Test monadic operations on std::optional")
 
     SECTION("optional | get")
     {
-        // Piping optional through Get preserves the reference type
-        static_assert(std::is_same_v<decltype(opt | get), int&>, "optional& -> T&");
-        static_assert(std::is_same_v<decltype(std::move(opt) | get), int&&>, "optional&& -> T&&");
-        static_assert(std::is_same_v<decltype(copt | get), int const&>, "optional const& -> T const&");
-        static_assert(std::is_same_v<decltype(std::move(copt) | get), int const&&>, "optional const&& -> T const&&");
+        // Piping optional through Get returns by value (not the same as opt.value())
+        static_assert(std::is_same_v<decltype(opt | get), int>, "optional& -> T&");
+        static_assert(std::is_same_v<decltype(std::move(opt) | get), int>, "optional&& -> T&&");
+        static_assert(std::is_same_v<decltype(copt | get), int>, "optional const& -> T const&");
+        static_assert(std::is_same_v<decltype(std::move(copt) | get), int>, "optional const&& -> T const&&");
 
         CHECK((opt | get) == 42);
         CHECK_THROWS_AS(empty | get, std::bad_optional_access);
@@ -79,8 +79,11 @@ TEST_CASE("Test monadic operations on std::optional")
         CHECK((empty | then(f)) == empty);
     }
 
-    SECTION("when_all(optional, optional) | apply")
+    SECTION("when_all(optional...) | apply")
     {
+        static_assert(std::is_same_v<std::optional<std::tuple<int>>, decltype(when_all(opt))>);
+        static_assert(std::is_same_v<std::optional<std::tuple<int, int>>, decltype(when_all(opt, empty))>);
+
         CHECK((when_all(opt, copt) | apply(std::plus<>{}) | get) == 69);
 
         // operator& is shorthand for when_all

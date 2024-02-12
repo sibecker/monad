@@ -10,7 +10,7 @@
 
 namespace sib::monad {
     template<typename R>
-    R operator|(std::function<R()> function, Get)
+    R operator|(std::function<R()> const& function, Get)
     {
         return function();
     }
@@ -18,7 +18,7 @@ namespace sib::monad {
     template<typename Signature>
     std::function<Signature> operator|(std::function<Signature> function, Flatten)
     {
-        return function;
+        return std::move(function);
     }
 
     template<typename R, typename... InnerArgs, typename... OuterArgs>
@@ -27,5 +27,11 @@ namespace sib::monad {
         return [function](InnerArgs... innerArgs, OuterArgs... outerArgs) {
             return function(std::move(outerArgs)...)(std::move(innerArgs)...);
         };
+    }
+
+    template<typename Signature>
+    std::function<Signature> operator^(std::function<Signature> lhs, std::function<Signature> const&)
+    {
+        return std::move(lhs);
     }
 }

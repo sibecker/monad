@@ -10,6 +10,12 @@ namespace sib::monad {
 static inline constexpr class Get {} get;
 static inline constexpr class Flatten {} flatten;
 
+template<typename Head, typename... Tail>
+auto when_any(Head&& head, Tail&&... tail)
+{
+    return (std::forward<Head>(head) ^ ... ^ std::forward<Tail>(tail));
+}
+
 template<typename Invokable>
 class Then
 {
@@ -68,6 +74,25 @@ template<typename Applicable>
 Apply<std::decay_t<Applicable>> apply(Applicable&& applicable)
 {
     return Apply<std::decay_t<Applicable>>{std::forward<Applicable>(applicable)};
+}
+
+template<typename Head, typename... Tail>
+auto when_all(Head&& head, Tail&&... tail)
+{
+    auto make_tuple = [](auto&& head){ return std::make_tuple(std::forward<decltype(head)>(head)); };
+    return ((std::forward<Head>(head) | then(make_tuple)) & ... & std::forward<Tail>(tail));
+}
+
+template<typename Tuple, typename Applicable>
+auto operator|(Tuple&& tuple, Apply<Applicable> const& apply)
+{
+    return std::forward<Tuple>(tuple) | then(apply);
+}
+
+template<typename Tuple, typename Applicable>
+auto operator|(Tuple&& tuple, Apply<Applicable>&& apply)
+{
+    return std::forward<Tuple>(tuple) | then(std::move(apply));
 }
 
 }

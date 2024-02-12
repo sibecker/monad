@@ -13,6 +13,7 @@ TEST_CASE("Test monadic operations on std::function")
     using namespace std::string_literals;
 
     std::function<std::string()> const hello = []{ return "Hello"s; };
+    std::function<std::string()> const world = []{ return "World!"s; };
     std::function<std::string(std::string const&)> const echo = [](std::string const& s){
         return s;
     };
@@ -36,5 +37,14 @@ TEST_CASE("Test monadic operations on std::function")
 
         CHECK((hello | flatten | get) == "Hello"s);
         CHECK((fun_of_fun | flatten)("Hello", 2) == "HelloHello"s);
+    }
+
+    SECTION("when_any(function...)")
+    {
+        std::function<std::string()> const hello_or_world = when_any(hello, world);
+        CHECK(((hello_or_world() == hello()) || (hello_or_world() == world())));
+
+        auto const hobsons_choice = hello ^ hello ^ hello ^ hello;
+        CHECK(hobsons_choice() == "Hello"s);
     }
 }

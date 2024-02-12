@@ -11,32 +11,26 @@
 namespace sib::monad {
 
 template<typename T>
-T& operator|(std::optional<T>& opt, Get) {
+T operator|(std::optional<T> const& opt, Get)
+{
     return opt.value();
 }
 
 template<typename T>
-T const& operator|(std::optional<T> const& opt, Get) {
-    return opt.value();
-}
-
-template<typename T>
-T&& operator|(std::optional<T>&& opt, Get) {
+T operator|(std::optional<T>&& opt, Get)
+{
     return std::move(opt).value();
 }
 
 template<typename T>
-T const&& operator|(std::optional<T> const&& opt, Get) {
-    return std::move(opt).value();
-}
-
-template<typename T>
-std::optional<T> operator|(std::optional<T> opt, Flatten) {
+std::optional<T> operator|(std::optional<T> opt, Flatten)
+{
     return std::move(opt);
 }
 
 template<typename T>
-std::optional<T> operator|(std::optional<std::optional<T>> opt, Flatten) {
+std::optional<T> operator|(std::optional<std::optional<T>> opt, Flatten)
+{
     return std::move(opt).value_or(std::nullopt);
 }
 
@@ -62,18 +56,6 @@ template<typename T>
 std::optional<T> operator^(std::optional<T>&& lhs, std::optional<T>&& rhs)
 {
     return lhs ? std::move(lhs) : std::move(rhs);
-}
-
-template<typename T, typename... Tail>
-std::optional<T> when_any(std::optional<T> const& head, Tail&&... tail)
-{
-    return (head ^ ... ^ tail);
-}
-
-template<typename T, typename... Tail>
-std::optional<T> when_any(std::optional<T>&& head, Tail&&... tail)
-{
-    return (std::move(head) ^ ... ^ tail);
 }
 
 template<typename T, typename Invokable>
@@ -146,36 +128,6 @@ std::optional<std::tuple<T, U>> operator&(std::optional<T> lhs, std::optional<U>
     return lhs && rhs ?
         std::optional<std::tuple<T, U>>{std::tuple<T, U>{std::move(*lhs), std::move(*rhs)}} :
         std::optional<std::tuple<T, U>>{};
-}
-
-template<typename T, typename... Tail>
-auto when_all(std::optional<T> head, Tail&&... tail)
-{
-    return (std::move(head) & ... & tail);
-}
-
-template<typename... Ts, typename Applicable>
-auto operator|(std::optional<std::tuple<Ts...>> const& tuple, Apply<Applicable> const& apply)
-{
-    return tuple | then(apply);
-}
-
-template<typename... Ts, typename Applicable>
-auto operator|(std::optional<std::tuple<Ts...>>&& tuple, Apply<Applicable> const& apply)
-{
-    return std::move(tuple) | then(apply);
-}
-
-template<typename... Ts, typename Applicable>
-auto operator|(std::optional<std::tuple<Ts...>> const& tuple, Apply<Applicable>&& apply)
-{
-    return tuple | then(std::move(apply));
-}
-
-template<typename... Ts, typename Applicable>
-auto operator|(std::optional<std::tuple<Ts...>>&& tuple, Apply<Applicable>&& apply)
-{
-    return std::move(tuple) | then(std::move(apply));
 }
 
 }
