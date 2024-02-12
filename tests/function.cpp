@@ -52,4 +52,14 @@ TEST_CASE("Test monadic operations on std::function")
     {
         CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get) == "Hello, World!");
     }
+
+    SECTION("function & function")
+    {
+        auto const merge = [](std::string const& x, std::string const& y) {
+            return x + ", "s + y;
+        };
+
+        CHECK(((hello & world) | then(apply(merge)) | get) == "Hello, World!"s);
+        CHECK((when_all(hello, world) | then(apply(merge)) | get) == "Hello, World!"s);
+    }
 }
