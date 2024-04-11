@@ -12,22 +12,25 @@ TEST_CASE("Test monadic operations on std::packaged_task")
     using namespace sib::monad;
     using namespace std::string_literals;
 
-    std::packaged_task<std::string()> world{[]{ return "World!"s; }};
-    std::packaged_task<std::string(std::string const&)> echo{[](std::string const& s){
-        return s;
-    }};
 
-    SECTION("task | get")
+    SECTION("task | get()")
     {
-        // get is only supported for no-argument tasks
         std::packaged_task<std::string()> hello{[]{ return "Hello"s; }};
-        CHECK((std::move(hello) | get) == "Hello"s);
+        CHECK((std::move(hello) | get()) == "Hello"s);
     }
 
-    SECTION("function | flatten")
+    SECTION("task | get(...)")
+    {
+        std::packaged_task<std::string(std::string const&)> echo{[](std::string const& s){
+            return s;
+        }};
+        CHECK((std::move(echo) | get("World")) == "World"s);
+    }
+
+    SECTION("task | flatten()")
     {
         std::packaged_task<std::string()> hello{[]{ return "Hello"s; }};
-        CHECK((std::move(hello) | flatten | get) == "Hello"s);
+        CHECK((std::move(hello) | flatten() | get()) == "Hello"s);
 
         std::packaged_task<std::packaged_task<std::string(std::string const&)>(unsigned int)> task_of_task{
             [](unsigned int n){
@@ -40,26 +43,52 @@ TEST_CASE("Test monadic operations on std::packaged_task")
             }
         };
 
-        auto flattened_task = std::move(task_of_task) | flatten;
+        auto flattened_task = std::move(task_of_task) | flatten();
         flattened_task("Hello"s, 2);
         CHECK(flattened_task.get_future().get() == "HelloHello"s);
     }
 
+    SECTION("when_any(task...)")
+    {
+        std::packaged_task < std::string() > hello{[] { return "Hello"s; }};
+        std::packaged_task < std::string() > world{[] { return "World!"s; }};
+
+        std::packaged_task < std::string() > hello_or_world = when_any(std::move(hello), std::move(world));
+        auto const result = std::move(hello_or_world) | get();
+        CHECK((result == "Hello"s || result == "world!"s));
+
+        std::packaged_task < std::string() > hello1{[] { return "Hello"s; }};
+        std::packaged_task < std::string() > hello2{[] { return "Hello"s; }};
+        std::packaged_task < std::string() > hello3{[] { return "Hello"s; }};
+        std::packaged_task < std::string() > hello4{[] { return "Hello"s; }};
+
+        auto hobsons_choice = std::move(hello1) ^ std::move(hello2) ^ std::move(hello3) ^ std::move(hello4);
+        CHECK((std::move(hobsons_choice) | get()) == "Hello"s);
+    }
+
+    SECTION("when_any(task...) with exceptions")
+    {
+        std::packaged_task<std::string()> hello1{[]{ return "Hello"s; }};
+        std::packaged_task<std::string()> hello2{[]{ return "Hello"s; }};
+
+        std::packaged_task<std::string()> except1{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
+        std::packaged_task<std::string()> except2{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
+        std::packaged_task<std::string()> except3{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
+        std::packaged_task<std::string()> except4{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
+
+        CHECK(((std::move(hello1) ^ std::move(except1)) | get()) == "Hello"s);
+        CHECK(((std::move(except2) ^ std::move(hello2)) | get()) == "Hello"s);
+        CHECK_THROWS_AS((std::move(except3) ^ std::move(except4)) | get(), std::runtime_error);
+    }
+
+    SECTION("task | then")
+    {
+        std::packaged_task < std::string() > hello{[] { return "Hello"s; }};
+
+        CHECK((std::move(hello) | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
+    }
+
     /*
-    SECTION("when_any(function...)")
-    {
-        std::function<std::string()> const hello_or_world = when_any(hello, world);
-        CHECK(((hello_or_world() == hello()) || (hello_or_world() == world())));
-
-        auto const hobsons_choice = hello ^ hello ^ hello ^ hello;
-        CHECK(hobsons_choice() == "Hello"s);
-    }
-
-    SECTION("function | then")
-    {
-        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get) == "Hello, World!");
-    }
-
     SECTION("function & function")
     {
         auto const merge = [](std::string const& x, std::string const& y) {

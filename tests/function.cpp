@@ -18,13 +18,19 @@ TEST_CASE("Test monadic operations on std::function")
         return s;
     };
 
-    SECTION("function | get")
+    SECTION("function | get()")
     {
         // get is only supported for no-argument functions
-        CHECK((hello | get) == "Hello"s);
+        CHECK((hello | get()) == "Hello"s);
     }
 
-    SECTION("function | flatten")
+    SECTION("function | get(...)")
+    {
+        // get is only supported for no-argument functions
+        CHECK((echo | get("World")) == "World"s);
+    }
+
+    SECTION("function | flatten()")
     {
         std::function<std::function<std::string(std::string const&)>(unsigned int)> const fun_of_fun = [](unsigned int n){
             return [n](std::string const& s){
@@ -35,8 +41,8 @@ TEST_CASE("Test monadic operations on std::function")
             };
         };
 
-        CHECK((hello | flatten | get) == "Hello"s);
-        CHECK((fun_of_fun | flatten)("Hello", 2) == "HelloHello"s);
+        CHECK((hello | flatten() | get()) == "Hello"s);
+        CHECK((fun_of_fun | flatten())("Hello", 2) == "HelloHello"s);
     }
 
     SECTION("when_any(function...)")
@@ -48,9 +54,18 @@ TEST_CASE("Test monadic operations on std::function")
         CHECK(hobsons_choice() == "Hello"s);
     }
 
-    SECTION("function | then")
+    SECTION("when_any(function...) with exceptions")
     {
-        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get) == "Hello, World!");
+        std::function<std::string()> const except = []() -> std::string { throw std::runtime_error{"Exception!"}; };
+
+        CHECK((hello ^ except)() == "Hello"s);
+        CHECK((except ^ hello)() == "Hello"s);
+        CHECK_THROWS_AS((except ^ except)(), std::runtime_error);
+    }
+
+    SECTION("function | then(...)")
+    {
+        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
     }
 
     SECTION("function & function")
@@ -59,7 +74,7 @@ TEST_CASE("Test monadic operations on std::function")
             return x + ", "s + y;
         };
 
-        CHECK(((hello & world) | then(apply(merge)) | get) == "Hello, World!"s);
-        CHECK((when_all(hello, world) | then(apply(merge)) | get) == "Hello, World!"s);
+        CHECK(((hello & world) | then(apply(merge)) | get()) == "Hello, World!"s);
+        CHECK((when_all(hello, world) | then(apply(merge)) | get()) == "Hello, World!"s);
     }
 }

@@ -9,10 +9,16 @@
 #include "monad/monad.h"
 
 namespace sib::monad {
-    template<typename R>
-    R operator|(std::function<R()> const& function, Get)
+    template<typename R, typename... Args, typename... GArgs>
+    R operator|(std::function<R(Args...)> const& function, Get<GArgs...>&& get)
     {
-        return function();
+        return std::apply(function, std::move(get.args));
+    }
+
+    template<typename R, typename... Args, typename... GArgs>
+    R operator|(std::function<R(Args...)> const& function, Get<GArgs...> const& get)
+    {
+        return std::apply(function, get.args);
     }
 
     template<typename Signature>
@@ -29,10 +35,15 @@ namespace sib::monad {
         };
     }
 
-    template<typename Signature>
-    std::function<Signature> operator^(std::function<Signature> lhs, std::function<Signature> const&)
+    template<typename R, typename... Args>
+    std::function<R(Args...)> operator^(std::function<R(Args...)> lhs, std::function<R(Args...)> rhs)
     {
-        return std::move(lhs);
+        return [lhs = std::move(lhs), rhs = std::move(rhs)](Args... args) {
+            try {
+                return lhs(args...);
+            } catch (...) {}
+            return rhs(args...);
+        };
     }
 
     template<typename R, typename... Args, typename Invokable>
