@@ -5,8 +5,7 @@
 
 #pragma once
 
-#include <future>
-#include "monad/monad.h"
+#include "monad/shared_task.h"
 
 namespace sib::monad {
 

@@ -6,6 +6,7 @@ add_executable(tests
         optional.cpp
         function.cpp
         task.cpp
+        shared_task.cpp
 )
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 target_link_libraries(tests PUBLIC monad)

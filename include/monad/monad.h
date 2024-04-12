@@ -93,6 +93,13 @@ static constexpr inline struct {
     }
 } apply;
 
+class Share{};
+static inline constexpr struct {
+    Share operator()() const {
+        return Share{};
+    }
+} share;
+
 static constexpr inline struct {
     template<typename Head, typename... Tail>
     auto operator()(Head&& head, Tail&& ... tail) const {

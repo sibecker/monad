@@ -7,5 +7,6 @@ add_library(monad INTERFACE
         monad/optional.h
         monad/function.h
         monad/task.h
+        monad/shared_task.h
 )
 target_include_directories(monad INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
