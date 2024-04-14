@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <future>
 #include "monad/monad.h"
@@ -42,7 +43,7 @@ public:
 
     // Move construction is copy construction.
     shared_task(shared_task&& rhs) noexcept :
-        shared_task{rhs}
+        impl{rhs.impl}
     {}
 
     shared_task(shared_task const&) noexcept = default;
@@ -82,11 +83,19 @@ public:
 };
 
 namespace monad {
-    template<typename Signature>
-    shared_task<Signature> operator|(std::packaged_task<Signature> task, Share)
-    {
-        return shared_task<Signature>{std::move(task)};
+
+class Share{};
+static inline constexpr struct {
+    Share operator()() const {
+        return Share{};
     }
+} share;
+
+template<typename Signature>
+shared_task<Signature> operator|(std::packaged_task<Signature> task, Share)
+{
+    return shared_task<Signature>{std::move(task)};
 }
 
+}
 }

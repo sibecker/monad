@@ -62,6 +62,7 @@ TEST_CASE("Test monadic operations on std::packaged_task")
         std::packaged_task < std::string() > hello3{[] { return "Hello"s; }};
         std::packaged_task < std::string() > hello4{[] { return "Hello"s; }};
 
+        using sib::monad::parallel::operator^;
         auto hobsons_choice = std::move(hello1) ^ std::move(hello2) ^ std::move(hello3) ^ std::move(hello4);
         CHECK((std::move(hobsons_choice) | get()) == "Hello"s);
     }
@@ -76,6 +77,7 @@ TEST_CASE("Test monadic operations on std::packaged_task")
         std::packaged_task<std::string()> except3{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
         std::packaged_task<std::string()> except4{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
 
+        using sib::monad::parallel::operator^;
         CHECK(((std::move(hello1) ^ std::move(except1)) | get()) == "Hello"s);
         CHECK(((std::move(except2) ^ std::move(hello2)) | get()) == "Hello"s);
         CHECK_THROWS_AS((std::move(except3) ^ std::move(except4)) | get(), std::runtime_error);

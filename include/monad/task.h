@@ -50,25 +50,61 @@ std::packaged_task<R(InnerArgs..., OuterArgs...)>
     };
 }
 
-template<typename R, typename... Args>
-std::packaged_task<R(Args...)> operator^(std::packaged_task<R(Args...)> lhs, std::packaged_task<R(Args...)> rhs)
-{
-    return std::packaged_task<R(Args...)> {
+namespace sequence {
+    template<typename R, typename... Args>
+    std::packaged_task<R(Args...)> operator^(std::packaged_task<R(Args...)> lhs, std::packaged_task<R(Args...)> rhs) {
+        return std::packaged_task<R(Args...)>{
 #ifdef _MSC_VER
-        // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
-        // See https://github.com/microsoft/STL/issues/321
-        [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)), rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](Args... args) {
-            auto& lhs = *lptr;
-            auto& rhs = *rptr;
+            // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
+            // See https://github.com/microsoft/STL/issues/321
+            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)), rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](Args... args) {
+                auto& lhs = *lptr;
+                auto& rhs = *rptr;
 #else
-        [lhs = std::move(lhs), rhs = std::move(rhs)](Args const&... args) mutable {
+                [lhs = std::move(lhs), rhs = std::move(rhs)](Args const&... args) mutable {
 #endif
-            try {
-                return std::move(lhs) | get(args...);
-            } catch (...) {}
-            return std::move(rhs) | get(args...);
-        }
-    };
+                try {
+                    return std::move(lhs) | get(args...);
+                } catch (...) {}
+                return std::move(rhs) | get(args...);
+            }
+        };
+    }
+}
+
+namespace parallel {
+    template<typename R, typename... Args>
+    std::packaged_task<R(Args...)> operator^(std::packaged_task<R(Args...)> lhs, std::packaged_task<R(Args...)> rhs) {
+        return std::packaged_task<R(Args...)>{
+#ifdef _MSC_VER
+            // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
+            // See https://github.com/microsoft/STL/issues/321
+            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)), rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](Args... args) {
+                auto& lhs = *lptr;
+                auto& rhs = *rptr;
+#else
+            [lhs = std::move(lhs), rhs = std::move(rhs)](Args const&... args) mutable {
+#endif
+                std::array<std::future<R>, 2> futures = {lhs.get_future(), rhs.get_future()};
+                shared_task<std::size_t(std::size_t) > first{[](auto x) { return x; }};
+
+                std::thread{[lhs = std::move(lhs), first](Args... args) mutable {
+                    lhs(std::move(args)...);
+                    first(0);
+                }, args...}.detach();
+                std::thread{[rhs = std::move(rhs), first](Args... args) mutable {
+                    rhs(std::move(args)...);
+                    first(1);
+                }, args...}.detach();
+
+                auto const index = first.get_future().get();
+                try {
+                    return futures[index].get();
+                } catch (...) {}
+                return futures[1 - index].get();
+            }
+        };
+    }
 }
 
 template<typename R, typename... Args, typename Invokable>

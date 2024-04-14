@@ -26,10 +26,26 @@ static inline constexpr struct {
     }
 } flatten;
 
+namespace sequence{}
+namespace parallel{}
+
+enum class in : bool { sequence = false, parallel = true };
+
 static inline constexpr struct {
     template<typename Head, typename... Tail>
+    auto operator()(in manner, Head&& head, Tail&& ... tail) const {
+        if (manner == in::sequence) {
+            using namespace ::sib::monad::sequence;
+            return (std::forward<Head>(head) ^ ... ^ std::forward<Tail>(tail));
+        } else {
+            using namespace ::sib::monad::sequence;
+            return (std::forward<Head>(head) ^ ... ^ std::forward<Tail>(tail));
+        }
+    }
+
+    template<typename Head, typename... Tail>
     auto operator()(Head&& head, Tail&& ... tail) const {
-        return (std::forward<Head>(head) ^ ... ^ std::forward<Tail>(tail));
+        return (*this)(in::sequence, std::forward<Head>(head), std::forward<Tail>(tail)...);
     }
 } when_any;
 
@@ -93,18 +109,22 @@ static constexpr inline struct {
     }
 } apply;
 
-class Share{};
-static inline constexpr struct {
-    Share operator()() const {
-        return Share{};
-    }
-} share;
-
 static constexpr inline struct {
     template<typename Head, typename... Tail>
-    auto operator()(Head&& head, Tail&& ... tail) const {
+    auto operator()(in manner, Head&& head, Tail&& ... tail) const {
         auto make_tuple = [](auto&& head) { return std::make_tuple(std::forward<decltype(head)>(head)); };
-        return ((std::forward<Head>(head) | then(make_tuple)) & ... & std::forward<Tail>(tail));
+        if (manner == in::sequence) {
+            using namespace sequence;
+            return ((std::forward<Head>(head) | then(make_tuple)) & ... & std::forward<Tail>(tail));
+        } else {
+            using namespace parallel;
+            return ((std::forward<Head>(head) | then(make_tuple)) & ... & std::forward<Tail>(tail));
+        }
+    }
+
+    template<typename Head, typename... Tail>
+    auto operator()(Head&& head, Tail&& ... tail) const {
+        return (*this)(in::sequence, std::forward<Head>(head), std::forward<Tail>(tail)...);
     }
 } when_all;
 

@@ -50,6 +50,7 @@ TEST_CASE("Test monadic operations on std::function")
         std::function<std::string()> const hello_or_world = when_any(hello, world);
         CHECK(((hello_or_world() == hello()) || (hello_or_world() == world())));
 
+        using sib::monad::parallel::operator^;
         auto const hobsons_choice = hello ^ hello ^ hello ^ hello;
         CHECK(hobsons_choice() == "Hello"s);
     }
@@ -58,6 +59,7 @@ TEST_CASE("Test monadic operations on std::function")
     {
         std::function<std::string()> const except = []() -> std::string { throw std::runtime_error{"Exception!"}; };
 
+        using sib::monad::parallel::operator^;
         CHECK((hello ^ except)() == "Hello"s);
         CHECK((except ^ hello)() == "Hello"s);
         CHECK_THROWS_AS((except ^ except)(), std::runtime_error);
@@ -74,6 +76,7 @@ TEST_CASE("Test monadic operations on std::function")
             return x + ", "s + y;
         };
 
+        using sib::monad::parallel::operator&;
         CHECK(((hello & world) | then(apply(merge)) | get()) == "Hello, World!"s);
         CHECK((when_all(hello, world) | then(apply(merge)) | get()) == "Hello, World!"s);
     }
