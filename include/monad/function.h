@@ -37,8 +37,9 @@ namespace sib::monad {
 
     namespace sequence {
         template<typename R, typename... Args>
-        std::function<R(Args...)> operator^(std::function<R(Args...)> lhs, std::function<R(Args...)> rhs) {
-            return [lhs = std::move(lhs), rhs = std::move(rhs)](Args... args) {
+        std::function<R(Args...)> operator^(std::function<R(Args...)> lhs, std::function<R(Args...)> rhs)
+        {
+            return [lhs = std::move(lhs), rhs = std::move(rhs)](Args... args){
                 try {
                     return lhs(args...);
                 } catch (...) {}
@@ -49,7 +50,8 @@ namespace sib::monad {
 
     namespace parallel {
         template<typename R, typename... Args>
-        std::function<R(Args...)> operator^(std::function<R(Args...)> lhs, std::function<R(Args...)> rhs) {
+        std::function<R(Args...)> operator^(std::function<R(Args...)> lhs, std::function<R(Args...)> rhs)
+        {
             return [lhs = std::move(lhs), rhs = std::move(rhs)](Args... args) -> R {
                 std::packaged_task<R(Args...)> ltask{std::move(lhs)};
                 std::packaged_task<R(Args...)> rtask{std::move(rhs)};
@@ -70,31 +72,29 @@ namespace sib::monad {
     namespace sequence {
         template<typename T, typename U, typename... LArgs, typename... RArgs>
         std::function<std::tuple<T, U>(LArgs..., RArgs...)>
-                operator&(std::function<T(LArgs...)> lhs, std::function<U(RArgs...)> rhs) {
-            return [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
-                return std::tuple<T, U>{lhs(std::move(largs)...), rhs(std::move(rargs)...)};
-            };
+            operator&(std::function<T(LArgs...)> lhs, std::function<U(RArgs...)> rhs)
+        {
+            return (std::move(lhs) | then(std::make_tuple<T>)) & (std::move(rhs) | then(std::make_tuple<U>));
         }
 
         template<typename... Ts, typename U, typename... LArgs, typename... RArgs>
         std::function<std::tuple<Ts..., U>(LArgs..., RArgs...)>
-                operator&(std::function<std::tuple<Ts...>(LArgs...)> lhs, std::function<U(RArgs...)> rhs) {
-            return [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
-                return std::tuple_cat(lhs(std::move(largs)...), std::tuple<U>{rhs(std::move(rargs)...)});
-            };
+            operator&(std::function<std::tuple<Ts...>(LArgs...)> lhs, std::function<U(RArgs...)> rhs)
+        {
+            return std::move(lhs) & (std::move(rhs) | then(std::make_tuple<U>));
         }
 
         template<typename T, typename... Us, typename... LArgs, typename... RArgs>
         std::function<std::tuple<T, Us...>(LArgs..., RArgs...)>
-                operator&(std::function<T(LArgs...)> lhs, std::function<std::tuple<Us...>(RArgs...)> rhs) {
-            return [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
-                return std::tuple_cat(std::tuple<T>{lhs(std::move(largs)...)}, rhs(std::move(rargs)...));
-            };
+            operator&(std::function<T(LArgs...)> lhs, std::function <std::tuple<Us...>(RArgs...)> rhs)
+        {
+            return (std::move(lhs) | then(std::make_tuple<T>)) & std::move(rhs);
         }
 
         template<typename... Ts, typename... Us, typename... LArgs, typename... RArgs>
         std::function<std::tuple<Ts..., Us...>(LArgs..., RArgs...)>
-                operator&(std::function<std::tuple<Ts...>(LArgs...)> lhs, std::function<std::tuple<Us...>(RArgs...)> rhs) {
+            operator&(std::function<std::tuple<Ts...>(LArgs...)> lhs, std::function<std::tuple<Us...>(RArgs...)> rhs)
+        {
             return [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
                 return std::tuple_cat(lhs(std::move(largs)...), rhs(std::move(rargs)...));
             };
@@ -104,37 +104,29 @@ namespace sib::monad {
     namespace parallel {
         template<typename T, typename U, typename... LArgs, typename... RArgs>
         std::function<std::tuple<T, U>(LArgs..., RArgs...)>
-                operator&(std::function<T(LArgs...)> lhs, std::function<U(RArgs...)> rhs) {
-            return [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
-                auto lfuture = std::async(std::launch::async, lhs, std::move(largs)...);
-                auto rfuture = std::async(std::launch::async, rhs, std::move(rargs)...);
-                return std::tuple<T, U>{lfuture.get(), rfuture.get()};
-            };
-        }
-
-        template<typename T, typename... Us, typename... LArgs, typename... RArgs>
-        std::function<std::tuple<T, Us...>(LArgs..., RArgs...)>
-                operator&(std::function<T(LArgs...)> lhs, std::function<std::tuple<Us...>(RArgs...)> rhs) {
-            return [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
-                auto lfuture = std::async(std::launch::async, lhs, std::move(largs)...);
-                auto rfuture = std::async(std::launch::async, rhs, std::move(rargs)...);
-                return std::tuple_cat(std::tuple<T>{lfuture.get()}, rfuture.get());
-            };
+            operator&(std::function<T(LArgs...)> lhs, std::function<U(RArgs...)> rhs)
+        {
+            return (std::move(lhs) | then(std::make_tuple<T>)) & (std::move(rhs) | then(std::make_tuple<U>));
         }
 
         template<typename... Ts, typename U, typename... LArgs, typename... RArgs>
         std::function<std::tuple<Ts..., U>(LArgs..., RArgs...)>
-                operator&(std::function<std::tuple<Ts...>(LArgs...)> lhs, std::function<U(RArgs...)> rhs) {
-            return [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
-                auto lfuture = std::async(std::launch::async, lhs, std::move(largs)...);
-                auto rfuture = std::async(std::launch::async, rhs, std::move(rargs)...);
-                return std::tuple_cat(lfuture.get(), std::tuple<U>{rfuture.get()});
-            };
+            operator&(std::function<std::tuple<Ts...>(LArgs...)> lhs, std::function<U(RArgs...)> rhs)
+        {
+            return std::move(lhs) & (std::move(rhs) | then(std::make_tuple<U>));
+        }
+
+        template<typename T, typename... Us, typename... LArgs, typename... RArgs>
+        std::function<std::tuple<T, Us...>(LArgs..., RArgs...)>
+            operator&(std::function<T(LArgs...)> lhs, std::function<std::tuple<Us...>(RArgs...)> rhs)
+        {
+            return (std::move(lhs) | then(std::make_tuple<T>)) & std::move(rhs);
         }
 
         template<typename... Ts, typename... Us, typename... LArgs, typename... RArgs>
         std::function<std::tuple<Ts..., Us...>(LArgs..., RArgs...)>
-                operator&(std::function<std::tuple<Ts...>(LArgs...)> lhs, std::function<std::tuple<Us...>(RArgs...)> rhs) {
+            operator&(std::function<std::tuple<Ts...>(LArgs...)> lhs, std::function<std::tuple<Us...>(RArgs...)> rhs)
+        {
             return [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
                 auto lfuture = std::async(std::launch::async, lhs, std::move(largs)...);
                 auto rfuture = std::async(std::launch::async, rhs, std::move(rargs)...);

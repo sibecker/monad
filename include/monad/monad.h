@@ -5,6 +5,9 @@
 
 #pragma once
 
+#include <tuple>
+#include <utility>
+
 namespace sib::monad {
 
 template<typename... Args>
@@ -14,14 +17,16 @@ struct Get
 };
 static inline constexpr struct {
     template<typename... Args>
-    Get<Args...> operator()(Args&& ... args) const {
+    Get<Args...> operator()(Args&& ... args) const
+    {
         return Get<Args...>{std::forward<Args>(args)...};
     }
 } get;
 
 class Flatten {};
 static inline constexpr struct {
-    Flatten operator()() const {
+    Flatten operator()() const
+    {
         return Flatten{};
     }
 } flatten;
@@ -33,7 +38,8 @@ enum class in : bool { sequence = false, parallel = true };
 
 static inline constexpr struct {
     template<typename Head, typename... Tail>
-    auto operator()(in manner, Head&& head, Tail&& ... tail) const {
+    auto operator()(in manner, Head&& head, Tail&& ... tail) const
+    {
         if (manner == in::sequence) {
             using namespace ::sib::monad::sequence;
             return (std::forward<Head>(head) ^ ... ^ std::forward<Tail>(tail));
@@ -44,7 +50,8 @@ static inline constexpr struct {
     }
 
     template<typename Head, typename... Tail>
-    auto operator()(Head&& head, Tail&& ... tail) const {
+    auto operator()(Head&& head, Tail&& ... tail) const
+    {
         return (*this)(in::sequence, std::forward<Head>(head), std::forward<Tail>(tail)...);
     }
 } when_any;
@@ -74,7 +81,8 @@ public:
 };
 static constexpr inline struct {
     template<typename Invokable>
-    Then<std::decay_t<Invokable>> operator()(Invokable&& invokable) const {
+    Then<std::decay_t<Invokable>> operator()(Invokable&& invokable) const
+    {
         return Then<std::decay_t<Invokable>>{std::forward<Invokable>(invokable)};
     }
 } then;
@@ -104,14 +112,16 @@ public:
 };
 static constexpr inline struct {
     template<typename Applicable>
-    Apply<std::decay_t<Applicable>> operator()(Applicable&& applicable) const {
+    Apply<std::decay_t<Applicable>> operator()(Applicable&& applicable) const
+    {
         return Apply<std::decay_t<Applicable>>{std::forward<Applicable>(applicable)};
     }
 } apply;
 
 static constexpr inline struct {
     template<typename Head, typename... Tail>
-    auto operator()(in manner, Head&& head, Tail&& ... tail) const {
+    auto operator()(in manner, Head&& head, Tail&& ... tail) const
+    {
         auto make_tuple = [](auto&& head) { return std::make_tuple(std::forward<decltype(head)>(head)); };
         if (manner == in::sequence) {
             using namespace sequence;
@@ -123,7 +133,8 @@ static constexpr inline struct {
     }
 
     template<typename Head, typename... Tail>
-    auto operator()(Head&& head, Tail&& ... tail) const {
+    auto operator()(Head&& head, Tail&& ... tail) const
+    {
         return (*this)(in::sequence, std::forward<Head>(head), std::forward<Tail>(tail)...);
     }
 } when_all;
@@ -140,4 +151,4 @@ auto operator|(Tuple&& tuple, Apply<Applicable>&& apply)
     return std::forward<Tuple>(tuple) | then(std::move(apply));
 }
 
-}
+};

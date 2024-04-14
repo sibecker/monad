@@ -50,8 +50,8 @@ TEST_CASE("Test monadic operations on std::packaged_task")
 
     SECTION("when_any(task...)")
     {
-        std::packaged_task < std::string() > hello{[] { return "Hello"s; }};
-        std::packaged_task < std::string() > world{[] { return "World!"s; }};
+        std::packaged_task <std::string()> hello{[] { return "Hello"s; }};
+        std::packaged_task <std::string()> world{[] { return "World!"s; }};
 
         std::packaged_task < std::string() > hello_or_world = when_any(std::move(hello), std::move(world));
         auto const result = std::move(hello_or_world) | get();
@@ -85,20 +85,25 @@ TEST_CASE("Test monadic operations on std::packaged_task")
 
     SECTION("task | then")
     {
-        std::packaged_task < std::string() > hello{[] { return "Hello"s; }};
+        std::packaged_task<std::string()> hello{[] { return "Hello"s; }};
 
         CHECK((std::move(hello) | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
     }
 
-    /*
     SECTION("function & function")
     {
+        std::packaged_task<std::string()> hello{[] { return "Hello"s; }};
+        std::packaged_task<std::string()> world{[] { return "World!"s; }};
+
         auto const merge = [](std::string const& x, std::string const& y) {
             return x + ", "s + y;
         };
 
-        CHECK(((hello & world) | then(apply(merge)) | get) == "Hello, World!"s);
-        CHECK((when_all(hello, world) | then(apply(merge)) | get) == "Hello, World!"s);
+        using sib::monad::parallel::operator&;
+        CHECK(((std::move(hello) & std::move(world)) | then(apply(merge)) | get()) == "Hello, World!"s);
+
+        hello = std::packaged_task<std::string()>{[] { return "Hello"s; }};
+        world = std::packaged_task<std::string()>{[] { return "World!"s; }};
+        CHECK((when_all(std::move(hello), std::move(world)) | then(apply(merge)) | get()) == "Hello, World!"s);
     }
-     */
 }
