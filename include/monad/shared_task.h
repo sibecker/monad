@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <future>
+#include <type_traits>
 #include "monad/monad.h"
 
 namespace sib {
@@ -62,10 +63,20 @@ public:
     {}
 
     // ... but EXPLICIT from anything else (e.g. a lambda, std::function etc.)
-    template<typename... CArgs>
-    explicit shared_task(CArgs&& ... args) :
-        shared_task{std::packaged_task<R(Args...)>{std::forward<CArgs>(args)...}}
-    {}
+    template<typename Callable>
+    explicit shared_task(Callable&& callable) :
+        impl{nullptr}
+    {
+        if constexpr(std::is_copy_constructible_v<std::decay_t<Callable>>) {
+            impl = std::make_shared<Impl>(std::packaged_task<R(Args...)>{std::forward<Callable>(callable)});
+        } else {
+            impl = std::make_shared<Impl>(std::packaged_task<R(Args...)>{
+                [ptr = std::make_shared<std::decay_t<Callable>>(std::move(callable))](Args... args){
+                    return std::invoke(*ptr, std::move(args)...);
+                }
+            });
+        }
+    }
 
     void operator()(Args... args) const
     {

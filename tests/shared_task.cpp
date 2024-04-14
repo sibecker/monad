@@ -29,13 +29,16 @@ TEST_CASE("Test basic operations on shared_task")
 
     SECTION("Call twice")
     {
-        // Construct from lambda
-        sib::shared_task<std::string(int x)> const to_string{
-            [](int x){ return std::to_string(x); }
+        // Construct from mutable, move-only lambda
+        sib::shared_task<std::string()> const to_string{
+            [calls = std::make_unique<int>(0)]() mutable {
+                ++(*calls);
+                return std::to_string(*calls);
+            }
         };
 
-        to_string(1);
-        to_string(2);
+        to_string();
+        to_string();
         CHECK(to_string.get_future().get() == "1"s);
     }
 
