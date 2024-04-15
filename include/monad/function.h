@@ -52,7 +52,7 @@ namespace sib::monad {
         template<typename R, typename... Args>
         std::function<R(Args...)> operator^(std::function<R(Args...)> lhs, std::function<R(Args...)> rhs)
         {
-            return [lhs = std::move(lhs), rhs = std::move(rhs)](Args... args) -> R {
+            return [lhs = std::move(lhs), rhs = std::move(rhs)](Args... args) {
                 std::packaged_task<R(Args...)> ltask{std::move(lhs)};
                 std::packaged_task<R(Args...)> rtask{std::move(rhs)};
 

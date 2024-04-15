@@ -86,13 +86,13 @@ namespace parallel {
             [lhs = std::move(lhs), rhs = std::move(rhs)](Args const&... args) mutable {
 #endif
                 std::array<std::future<R>, 2> futures = {lhs.get_future(), rhs.get_future()};
-                shared_task<std::size_t(std::size_t) > first{[](auto x) { return x; }};
+                shared_task<std::size_t(std::size_t)> const first{[](auto x) { return x; }};
 
-                std::thread{[lhs = std::move(lhs), first](Args... args) mutable {
+                std::thread{[lhs = std::move(lhs), first = first](Args... args) mutable {
                     lhs(std::move(args)...);
                     first(0);
                 }, args...}.detach();
-                std::thread{[rhs = std::move(rhs), first](Args... args) mutable {
+                std::thread{[rhs = std::move(rhs), first = first](Args... args) mutable {
                     rhs(std::move(args)...);
                     first(1);
                 }, args...}.detach();
