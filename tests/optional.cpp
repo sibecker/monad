@@ -6,7 +6,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "monad/optional.h"
-#include <functional>
 
 TEST_CASE("Test monadic operations on std::optional")
 {
@@ -87,12 +86,14 @@ TEST_CASE("Test monadic operations on std::optional")
         CHECK((when_all(opt, copt) | apply(std::plus<>{}) | get()) == 69);
 
         // operator& is shorthand for when_all
+        using sib::monad::non_tuple::operator&;
         CHECK(((opt & copt) | apply(std::plus<>{}) | get()) == 69);
     }
 
     SECTION("(((empty ^ opt) | then(f)) & copt) | apply(minus)")
     {
         // A complex expression using all the (public) monadic operations
+        using sib::monad::non_tuple::operator&;
         CHECK(((((empty ^ opt) | then(f)) & copt) | apply(std::minus<>{}) | get()) == 57);
     }
 

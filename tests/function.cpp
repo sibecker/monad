@@ -76,8 +76,10 @@ TEST_CASE("Test monadic operations on std::function")
             return x + ", "s + y;
         };
 
-        using sib::monad::parallel::operator&;
-        CHECK(((hello & world) | then(apply(merge)) | get()) == "Hello, World!"s);
-        CHECK((when_all(hello, world) | then(apply(merge)) | get()) == "Hello, World!"s);
+        static_assert(std::is_same_v<std::function<std::tuple<std::string>()>, decltype(when_all(hello))>);
+
+        using sib::monad::parallel::non_tuple::operator&;
+        CHECK(((hello & world) | apply(merge) | get()) == "Hello, World!"s);
+        CHECK((when_all(hello, world) | apply(merge) | get()) == "Hello, World!"s);
     }
 }

@@ -27,7 +27,7 @@ private:
         explicit Impl(std::packaged_task<R(Args...)> task) :
             future{task.get_future()},
             task{std::move(task)},
-            flag{false}
+            flag{}
         {}
     };
 

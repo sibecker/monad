@@ -99,7 +99,7 @@ TEST_CASE("Test monadic operations on std::packaged_task")
             return x + ", "s + y;
         };
 
-        using sib::monad::parallel::operator&;
+        using sib::monad::parallel::non_tuple::operator&;
         CHECK(((std::move(hello) & std::move(world)) | then(apply(merge)) | get()) == "Hello, World!"s);
 
         hello = std::packaged_task<std::string()>{[] { return "Hello"s; }};

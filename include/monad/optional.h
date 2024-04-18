@@ -98,36 +98,12 @@ auto operator|(std::optional<T>&& opt, Then<Invokable>&& f)
            Flattened{std::nullopt};
 }
 
-template<typename... Ts, typename... Us>
-std::optional<std::tuple<Ts..., Us...>> operator&(std::optional<std::tuple<Ts...>> lhs, std::optional<std::tuple<Us...>> rhs)
+template<typename... Ls, typename R>
+std::optional<std::tuple<Ls..., R>> operator&(std::optional<std::tuple<Ls...>> lhs, std::optional<R> rhs)
 {
     return lhs && rhs ?
-        std::optional<std::tuple<Ts..., Us...>>{std::tuple_cat(std::move(*lhs), std::move(*rhs))} :
-        std::optional<std::tuple<Ts..., Us...>>{};
-}
-
-template<typename T, typename... Us>
-std::optional<std::tuple<T, Us...>> operator&(std::optional<T> lhs, std::optional<std::tuple<Us...>> rhs)
-{
-    return lhs && rhs ?
-        std::optional<std::tuple<T, Us...>>{std::tuple_cat(std::tuple<T>{std::move(*lhs)}, std::move(*rhs))} :
-        std::optional<std::tuple<T, Us...>>{};
-}
-
-template<typename... Ts, typename U>
-std::optional<std::tuple<Ts..., U>> operator&(std::optional<std::tuple<Ts...>> lhs, std::optional<U> rhs)
-{
-    return lhs && rhs ?
-        std::optional<std::tuple<Ts..., U>>{std::tuple_cat(std::move(*lhs), std::tuple<U>(std::move(*rhs)))} :
-        std::optional<std::tuple<Ts..., U>>{};
-}
-
-template<typename T, typename U>
-std::optional<std::tuple<T, U>> operator&(std::optional<T> lhs, std::optional<U> rhs)
-{
-    return lhs && rhs ?
-        std::optional<std::tuple<T, U>>{std::tuple<T, U>{std::move(*lhs), std::move(*rhs)}} :
-        std::optional<std::tuple<T, U>>{};
+        std::optional<std::tuple<Ls..., R>>{std::tuple_cat(lhs | get(), std::move(rhs) | then(make_tuple) | get())} :
+        std::optional<std::tuple<Ls..., R>>{};
 }
 
 }

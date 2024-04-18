@@ -124,83 +124,45 @@ auto operator|(std::packaged_task<R(Args...)> task, Then<Invokable> then) -> std
 }
 
 namespace sequence {
-    template<typename T, typename U, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<T, U>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<T(LArgs...)> lhs, std::packaged_task<U(RArgs...)> rhs)
+    template<typename... Ls, typename R, typename... LArgs, typename... RArgs>
+    std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>
+        operator&(std::packaged_task<std::tuple<Ls...>(LArgs...)> lhs, std::packaged_task<R(RArgs...)> rhs)
     {
-        return (std::move(lhs) | then(std::make_tuple<T>)) & (std::move(rhs) | then(std::make_tuple<U>));
-    }
-
-    template<typename... Ts, typename U, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<Ts..., U>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<std::tuple<Ts...>(LArgs...)> lhs, std::packaged_task<U(RArgs...)> rhs)
-    {
-        return std::move(lhs) & (std::move(rhs) | then(std::make_tuple<U>));
-    }
-
-    template<typename T, typename... Us, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<T, Us...>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<T(LArgs...)> lhs, std::packaged_task<std::tuple<Us...>(RArgs...)> rhs)
-    {
-        return (std::move(lhs) | then(std::make_tuple<T>)) & std::move(rhs);
-    }
-
-    template<typename... Ts, typename... Us, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<Ts..., Us...>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<std::tuple<Ts...>(LArgs...)> lhs, std::packaged_task<std::tuple<Us...>(RArgs...)> rhs)
-    {
-        return std::packaged_task<std::tuple<Ts..., Us...>(LArgs..., RArgs...)>{
+        return std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>{
 #ifdef _MSC_VER
-            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)), rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](LArgs... largs, RArgs... rargs) {
+            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)),
+                    rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](LArgs... largs, RArgs... rargs) {
                 auto& lhs = *lptr;
                 auto& rhs = *rptr;
 #else
-            [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) mutable {
+            [lhs = std::move(lhs) | then(as_tuple), rhs = std::move(rhs) | then(as_tuple)](LArgs... largs, RArgs... rargs) mutable {
 #endif
-                return std::tuple_cat(std::move(lhs) | get(std::move(largs)...), std::move(rhs) | get(std::move(rargs)...));
+                return std::tuple_cat(std::move(lhs) | get(std::move(largs)...),
+                                      std::move(rhs) | then(make_tuple) | get(std::move(rargs)...));
             }
         };
     }
 }
 
 namespace parallel {
-    template<typename T, typename U, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<T, U>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<T(LArgs...)> lhs, std::packaged_task<U(RArgs...)> rhs)
+    template<typename... Ls, typename R, typename... LArgs, typename... RArgs>
+    std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>
+        operator&(std::packaged_task<std::tuple<Ls...>(LArgs...)> lhs, std::packaged_task<R(RArgs...)> rhs)
     {
-        return (std::move(lhs) | then(std::make_tuple<T>)) & (std::move(rhs) | then(std::make_tuple<U>));
-    }
-
-    template<typename... Ts, typename U, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<Ts..., U>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<std::tuple<Ts...>(LArgs...)> lhs, std::packaged_task<U(RArgs...)> rhs)
-    {
-        return std::move(lhs) & (std::move(rhs) | then(std::make_tuple<U>));
-    }
-
-    template<typename T, typename... Us, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<T, Us...>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<T(LArgs...)> lhs, std::packaged_task<std::tuple<Us...>(RArgs...)> rhs)
-    {
-        return (std::move(lhs) | then(std::make_tuple<T>)) & std::move(rhs);
-    }
-
-    template<typename... Ts, typename... Us, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<Ts..., Us...>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<std::tuple<Ts...>(LArgs...)> lhs, std::packaged_task<std::tuple<Us...>(RArgs...)> rhs)
-    {
-        return std::packaged_task<std::tuple<Ts..., Us...>(LArgs..., RArgs...)>{
+        return std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>{
 #ifdef _MSC_VER
-            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)), rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](LArgs... largs, RArgs... rargs) {
+            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)),
+                    rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](LArgs... largs, RArgs... rargs) {
                 auto& lhs = *lptr;
                 auto& rhs = *rptr;
 #else
-            [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) mutable {
+            [lhs = std::move(lhs, rhs](LArgs... largs, RArgs... rargs) mutable {
 #endif
+                auto rhs_as_tuple = std::move(rhs) | then(make_tuple);
                 auto lfuture = lhs.get_future();
-                auto rfuture = rhs.get_future();
+                auto rfuture = rhs_as_tuple.get_future();
                 auto lvoid = std::async(std::launch::async, std::move(lhs), std::move(largs)...);
-                auto rvoid = std::async(std::launch::async, std::move(rhs), std::move(rargs)...);
+                auto rvoid = std::async(std::launch::async, std::move(rhs_as_tuple), std::move(rargs)...);
                 std::ignore = lvoid, rvoid;
                 return std::tuple_cat(lfuture.get(), rfuture.get());
             }
