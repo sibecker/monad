@@ -10,6 +10,22 @@
 
 namespace sib::monad {
 
+static inline constexpr struct {
+    template<typename T>
+    auto operator()(T&& value) const
+    {
+        return std::forward<T>(value);
+    }
+} identity;
+
+static inline constexpr struct {
+    template<typename T>
+    auto operator()(T&& value) const
+    {
+        return std::make_tuple(std::forward<T>(value));
+    }
+} make_tuple;
+
 template<typename... Args>
 struct Get
 {
@@ -30,91 +46,6 @@ static inline constexpr struct {
         return Flatten{};
     }
 } flatten;
-
-static inline constexpr struct {
-    template<typename T>
-    auto operator()(T&& value) const
-    {
-        return std::make_tuple(std::forward<T>(value));
-    }
-} make_tuple;
-
-namespace non_tuple{
-    using namespace ::sib::monad;
-
-    template<template<typename> class Monad, typename L, typename R>
-    Monad<std::tuple<L, R>> operator&(Monad<L> lhs, Monad<R> rhs)
-    {
-        using ::sib::monad::operator&;
-        return (std::move(lhs) | then(make_tuple)) & std::move(rhs);
-    }
-}
-
-namespace sequence
-{
-    using namespace ::sib::monad;
-
-    namespace non_tuple {
-        using namespace ::sib::monad::non_tuple;
-
-        template<template<typename> class Monad, typename L, typename R>
-        Monad<std::tuple<L, R>> operator&(Monad<L> lhs, Monad<R> rhs)
-        {
-            using ::sib::monad::sequence::operator&;
-            return (std::move(lhs) | then(make_tuple)) & std::move(rhs);
-        }
-
-        template<template<typename> class Monad, typename L, typename R, typename... LArgs, typename... RArgs>
-        Monad<std::tuple<L, R>(LArgs..., RArgs...)> operator&(Monad<L(LArgs...)> lhs, Monad<R(RArgs...)> rhs)
-        {
-            using ::sib::monad::sequence::operator&;
-            return (std::move(lhs) | then(make_tuple)) & std::move(rhs);
-        }
-    }
-}
-namespace parallel
-{
-    using namespace ::sib::monad;
-    namespace non_tuple {
-        using namespace ::sib::monad::non_tuple;
-
-        template<template<typename> class Monad, typename L, typename R>
-        Monad<std::tuple<L, R>> operator&(Monad<L> lhs, Monad<R> rhs)
-        {
-            using ::sib::monad::parallel::operator&;
-            return (std::move(lhs) | then(make_tuple)) & std::move(rhs);
-        }
-
-        template<template<typename> class Monad, typename L, typename R, typename... LArgs, typename... RArgs>
-        Monad<std::tuple<L, R>(LArgs..., RArgs...)> operator&(Monad<L(LArgs...)> lhs, Monad<R(RArgs...)> rhs)
-        {
-            using ::sib::monad::parallel::operator&;
-            return (std::move(lhs) | then(make_tuple)) & std::move(rhs);
-        }
-    }
-}
-
-enum class in : bool { sequence = false, parallel = true };
-
-static inline constexpr struct {
-    template<typename Head, typename... Tail>
-    auto operator()(in manner, Head&& head, Tail&& ... tail) const
-    {
-        if (manner == in::sequence) {
-            using namespace ::sib::monad::sequence;
-            return (std::forward<Head>(head) ^ ... ^ std::forward<Tail>(tail));
-        } else {
-            using namespace ::sib::monad::parallel;
-            return (std::forward<Head>(head) ^ ... ^ std::forward<Tail>(tail));
-        }
-    }
-
-    template<typename Head, typename... Tail>
-    auto operator()(Head&& head, Tail&& ... tail) const
-    {
-        return (*this)(in::sequence, std::forward<Head>(head), std::forward<Tail>(tail)...);
-    }
-} when_any;
 
 template<typename Invokable>
 class Then
@@ -178,26 +109,6 @@ static constexpr inline struct {
     }
 } apply;
 
-static constexpr inline struct {
-    template<typename Head, typename... Tail>
-    auto operator()(in manner, Head&& head, Tail&& ... tail) const
-    {
-        if (manner == in::sequence) {
-            using namespace sequence;
-            return ((std::forward<Head>(head) | then(make_tuple)) & ... & std::forward<Tail>(tail));
-        } else {
-            using namespace parallel;
-            return ((std::forward<Head>(head) | then(make_tuple)) & ... & std::forward<Tail>(tail));
-        }
-    }
-
-    template<typename Head, typename... Tail>
-    auto operator()(Head&& head, Tail&& ... tail) const
-    {
-        return (*this)(in::sequence, std::forward<Head>(head), std::forward<Tail>(tail)...);
-    }
-} when_all;
-
 template<typename Tuple, typename Applicable>
 auto operator|(Tuple&& tuple, Apply<Applicable> const& apply)
 {
@@ -209,5 +120,89 @@ auto operator|(Tuple&& tuple, Apply<Applicable>&& apply)
 {
     return std::forward<Tuple>(tuple) | then(std::move(apply));
 }
+
+enum class in : bool { sequence = false, parallel = true };
+template<typename T>
+struct When
+{
+    in manner;
+    T value;
+
+    /*implicit*/ operator T() && { return std::move(value); }
+    /*implicit*/ operator T() const& { return value; }
+
+    T& operator()() & { return value; }
+    T const& operator()() const& { return value; }
+    T&& operator()() && { return std::move(value); }
+    T const&& operator()() const&& { return std::move(value); }
+};
+template<typename T, typename Rhs>
+auto operator|(When<T>&& lhs, Rhs&& rhs) { return std::move(lhs.value) | std::forward<Rhs>(rhs); }
+template<typename T, typename Rhs>
+auto operator|(When<T> const& lhs, Rhs&& rhs) { return lhs.value | std::forward<Rhs>(rhs); }
+
+template<typename Tuple, typename Applicable>
+auto operator|(When<Tuple>&& when, Apply<Applicable>&& apply)
+{
+    return std::move(when.value) | then(std::move(apply));
+}
+
+template<typename Tuple, typename Applicable>
+auto operator|(When<Tuple> const& tuple, Apply<Applicable>&& apply)
+{
+    return tuple.value | then(std::move(apply));
+}
+
+template<typename Tuple, typename Applicable>
+auto operator|(When<Tuple>&& when, Apply<Applicable> const& apply)
+{
+    return std::move(when.value) | then(apply);
+}
+
+template<typename Tuple, typename Applicable>
+auto operator|(When<Tuple> const& tuple, Apply<Applicable> const& apply)
+{
+    return tuple.value | then(apply);
+}
+
+template<typename T>
+When<std::decay_t<T>> operator^(in manner, T&& value)
+{
+    return {manner, std::forward<T>(value)};
+}
+
+template<typename Monad>
+auto operator&(in manner, Monad&& monad)
+{
+    return manner ^ (std::forward<Monad>(monad) | then(make_tuple));
+}
+
+static inline constexpr struct {
+    template<typename Head, typename... Tail>
+    auto operator()(in manner, Head&& head, Tail&& ... tail) const
+    {
+        return ((manner ^ std::forward<Head>(head)) ^ ... ^ std::forward<Tail>(tail));
+    }
+
+    template<typename Head, typename... Tail>
+    auto operator()(Head&& head, Tail&& ... tail) const
+    {
+        return (*this)(in::sequence, std::forward<Head>(head), std::forward<Tail>(tail)...);
+    }
+} when_any;
+
+static constexpr inline struct {
+    template<typename Head, typename... Tail>
+    auto operator()(in manner, Head&& head, Tail&& ... tail) const
+    {
+        return ((manner & std::forward<Head>(head)) & ... & std::forward<Tail>(tail));
+    }
+
+    template<typename Head, typename... Tail>
+    auto operator()(Head&& head, Tail&& ... tail) const
+    {
+        return (*this)(in::sequence, std::forward<Head>(head), std::forward<Tail>(tail)...);
+    }
+} when_all;
 
 };

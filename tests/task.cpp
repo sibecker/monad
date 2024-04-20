@@ -53,7 +53,7 @@ TEST_CASE("Test monadic operations on std::packaged_task")
         std::packaged_task <std::string()> hello{[] { return "Hello"s; }};
         std::packaged_task <std::string()> world{[] { return "World!"s; }};
 
-        std::packaged_task < std::string() > hello_or_world = when_any(std::move(hello), std::move(world));
+        std::packaged_task <std::string()> hello_or_world = std::move(when_any(std::move(hello), std::move(world)));
         auto const result = std::move(hello_or_world) | get();
         CHECK((result == "Hello"s || result == "world!"s));
 
@@ -62,8 +62,7 @@ TEST_CASE("Test monadic operations on std::packaged_task")
         std::packaged_task < std::string() > hello3{[] { return "Hello"s; }};
         std::packaged_task < std::string() > hello4{[] { return "Hello"s; }};
 
-        using sib::monad::parallel::operator^;
-        auto hobsons_choice = std::move(hello1) ^ std::move(hello2) ^ std::move(hello3) ^ std::move(hello4);
+        auto hobsons_choice = in::parallel ^ std::move(hello1) ^ std::move(hello2) ^ std::move(hello3) ^ std::move(hello4);
         CHECK((std::move(hobsons_choice) | get()) == "Hello"s);
     }
 
@@ -77,10 +76,9 @@ TEST_CASE("Test monadic operations on std::packaged_task")
         std::packaged_task<std::string()> except3{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
         std::packaged_task<std::string()> except4{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
 
-        using sib::monad::parallel::operator^;
-        CHECK(((std::move(hello1) ^ std::move(except1)) | get()) == "Hello"s);
-        CHECK(((std::move(except2) ^ std::move(hello2)) | get()) == "Hello"s);
-        CHECK_THROWS_AS((std::move(except3) ^ std::move(except4)) | get(), std::runtime_error);
+        CHECK(((in::parallel ^ std::move(hello1) ^ std::move(except1)) | get()) == "Hello"s);
+        CHECK(((in::parallel ^ std::move(except2) ^ std::move(hello2)) | get()) == "Hello"s);
+        CHECK_THROWS_AS((in::parallel ^ std::move(except3) ^ std::move(except4)) | get(), std::runtime_error);
     }
 
     SECTION("task | then")
@@ -90,20 +88,21 @@ TEST_CASE("Test monadic operations on std::packaged_task")
         CHECK((std::move(hello) | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
     }
 
-    SECTION("function & function")
+    SECTION("task & task")
     {
         std::packaged_task<std::string()> hello{[] { return "Hello"s; }};
+        std::packaged_task<std::string()> there{[] { return "there"s; }};
         std::packaged_task<std::string()> world{[] { return "World!"s; }};
 
-        auto const merge = [](std::string const& x, std::string const& y) {
-            return x + ", "s + y;
+        auto const merge = [](std::string const& x, std::string const& y, std::string const& z) {
+            return x + ", "s + y + ", "s + z;
         };
 
-        using sib::monad::parallel::non_tuple::operator&;
-        CHECK(((std::move(hello) & std::move(world)) | then(apply(merge)) | get()) == "Hello, World!"s);
+        CHECK(((in::parallel & std::move(hello) & std::move(there) & std::move(world)) | apply(merge) | get()) == "Hello, there, World!"s);
 
         hello = std::packaged_task<std::string()>{[] { return "Hello"s; }};
+        there = std::packaged_task<std::string()>{[] { return "there"s; }};
         world = std::packaged_task<std::string()>{[] { return "World!"s; }};
-        CHECK((when_all(std::move(hello), std::move(world)) | then(apply(merge)) | get()) == "Hello, World!"s);
+        CHECK((when_all(std::move(hello), std::move(there), std::move(world)) | apply(merge) | get()) == "Hello, there, World!"s);
     }
 }

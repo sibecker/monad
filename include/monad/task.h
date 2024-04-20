@@ -38,81 +38,75 @@ std::packaged_task<R(InnerArgs..., OuterArgs...)>
         // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
         // See https://github.com/microsoft/STL/issues/321
         [ptr = std::make_shared<decltype(task)>(std::move(task))](InnerArgs... innerArgs, OuterArgs... outerArgs) {
-            auto& outerTask = *ptr;
+            auto& task = *ptr;
 #else
-        [outerTask = std::move(task)](InnerArgs... innerArgs, OuterArgs... outerArgs) mutable {
+        [task = std::move(task)](InnerArgs... innerArgs, OuterArgs... outerArgs) mutable {
 #endif
-            outerTask(std::move(outerArgs)...);
-            std::packaged_task<R(InnerArgs...)> innerTask = outerTask.get_future().get();
-            innerTask(std::move(innerArgs)...);
-            return innerTask.get_future().get();
+            return std::move(task) | get(std::move(outerArgs)...) | get(std::move(innerArgs)...);
         }
     };
 }
 
-namespace sequence {
-    template<typename R, typename... Args>
-    std::packaged_task<R(Args...)> operator^(std::packaged_task<R(Args...)> lhs, std::packaged_task<R(Args...)> rhs) {
-        return std::packaged_task<R(Args...)>{
-#ifdef _MSC_VER
-            // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
-            // See https://github.com/microsoft/STL/issues/321
-            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)), rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](Args... args) {
-                auto& lhs = *lptr;
-                auto& rhs = *rptr;
-#else
-                [lhs = std::move(lhs), rhs = std::move(rhs)](Args const&... args) mutable {
-#endif
-                try {
-                    return std::move(lhs) | get(args...);
-                } catch (...) {}
-                return std::move(rhs) | get(args...);
-            }
-        };
-    }
+template<typename R, typename... Args>
+When<std::packaged_task<R(Args...)>> operator^(in manner, std::packaged_task<R(Args...)> task)
+{
+    return {manner, std::move(task)};
 }
 
-namespace parallel {
-    template<typename R, typename... Args>
-    std::packaged_task<R(Args...)> operator^(std::packaged_task<R(Args...)> lhs, std::packaged_task<R(Args...)> rhs) {
-        return std::packaged_task<R(Args...)>{
+template<typename R, typename... Args>
+When<std::packaged_task<R(Args...)>> operator^(When<std::packaged_task<R(Args...)>> lhs, std::packaged_task<R(Args...)> rhs) {
+    return {lhs.manner,
+        std::packaged_task<R(Args...)>{
 #ifdef _MSC_VER
             // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
             // See https://github.com/microsoft/STL/issues/321
-            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)), rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](Args... args) {
+            [manner = lhs.manner,
+             lptr = std::make_shared<decltype(lhs.value)>(std::move(lhs.value)),
+             rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](Args... args) {
                 auto& lhs = *lptr;
                 auto& rhs = *rptr;
 #else
-            [lhs = std::move(lhs), rhs = std::move(rhs)](Args const&... args) mutable {
+            [manner = lhs.manner, lhs = std::move(lhs.value), rhs = std::move(rhs)](Args... args) mutable {
 #endif
-                std::array<std::future<R>, 2> futures = {lhs.get_future(), rhs.get_future()};
-                shared_task<std::size_t(std::size_t)> const first{[](auto x) { return x; }};
+                if (manner == in::sequence) {
+                    try {
+                        return std::move(lhs) | get(args...);
+                    } catch (...) {}
+                    return std::move(rhs) | get(args...);
+                } else {
+                    std::array<std::future<R>, 2> futures = {lhs.get_future(), rhs.get_future()};
+                    shared_task<std::size_t(std::size_t)> const first{[](auto x) { return x; }};
 
-                std::thread{[lhs = std::move(lhs), first = first](Args... args) mutable {
-                    lhs(std::move(args)...);
-                    first(0);
-                }, args...}.detach();
-                std::thread{[rhs = std::move(rhs), first = first](Args... args) mutable {
-                    rhs(std::move(args)...);
-                    first(1);
-                }, args...}.detach();
+                    std::thread{[lhs = std::move(lhs), first = first](Args... args) mutable {
+                        lhs(std::move(args)...);
+                        first(0);
+                    }, args...}.detach();
+                    std::thread{[rhs = std::move(rhs), first = first](Args... args) mutable {
+                        rhs(std::move(args)...);
+                        first(1);
+                    }, args...}.detach();
 
-                auto const index = first.get_future().get();
-                try {
-                    return futures[index].get();
-                } catch (...) {}
-                return futures[1 - index].get();
+                    auto const index = first.get_future().get();
+                    try {
+                        return futures[index].get();
+                    } catch (...) {}
+                    return futures[1 - index].get();
+                }
             }
-        };
-    }
+        }
+    };
 }
 
 template<typename R, typename... Args, typename Invokable>
-auto operator|(std::packaged_task<R(Args...)> task, Then<Invokable> then) -> std::packaged_task<std::invoke_result_t<Invokable, R>(Args...)>
+auto operator|(std::packaged_task<R(Args...)> task, Then<Invokable> then)
 {
-    return std::packaged_task<std::invoke_result_t<Invokable, R>(Args...)> {
+    using Result = std::invoke_result_t<Invokable, R>;
+    return std::packaged_task<Result(Args...)> {
 #ifdef _MSC_VER
-        [task_ptr = std::make_shared<decltype(task)>(std::move(task)), then_ptr = std::make_shared<decltype(then)>(std::move(then))] (Args... args) {
+        // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
+        // See https://github.com/microsoft/STL/issues/321
+        [task_ptr = std::make_shared<decltype(task)>(std::move(task)),
+         then_ptr = std::make_shared<decltype(then)>(std::move(then))] (Args... args) {
             auto& task = *task_ptr;
             auto& then = *then_ptr;
 #else
@@ -120,54 +114,41 @@ auto operator|(std::packaged_task<R(Args...)> task, Then<Invokable> then) -> std
 #endif
             return std::move(then)(std::move(task) | get(std::move(args)...));
         }
+    } | flatten();
+}
+
+template<typename... Ls, typename R, typename... LArgs, typename... RArgs>
+When<std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>>
+    operator&(When<std::packaged_task<std::tuple<Ls...>(LArgs...)>> lhs, std::packaged_task<R(RArgs...)> rhs)
+{
+    return {lhs.manner,
+        std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>{
+#ifdef _MSC_VER
+            // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
+            // See https://github.com/microsoft/STL/issues/321
+            [manner = lhs.manner,
+             lptr = std::make_shared<decltype(lhs.value)>(std::move(lhs.value)),
+             rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](LArgs... largs, RArgs... rargs) {
+                auto& lhs = *lptr;
+                auto& rhs = *rptr;
+#else
+            [manner = lhs.manner, lhs = std::move(lhs.value), rhs = std::move(rhs)](Args... args) mutable {
+#endif
+                if (manner == in::sequence) {
+                    return std::tuple_cat(std::move(lhs) | get(std::move(largs)...),
+                                          std::move(rhs) | then(make_tuple) | get(std::move(rargs)...));
+                } else {
+                    auto rhs_as_tuple = std::move(rhs) | then(make_tuple);
+                    auto lfuture = lhs.get_future();
+                    auto rfuture = rhs_as_tuple.get_future();
+                    auto lvoid = std::async(std::launch::async, std::move(lhs), std::move(largs)...);
+                    auto rvoid = std::async(std::launch::async, std::move(rhs_as_tuple), std::move(rargs)...);
+                    std::ignore = lvoid, rvoid;
+                    return std::tuple_cat(lfuture.get(), rfuture.get());
+                }
+            }
+        }
     };
-}
-
-namespace sequence {
-    template<typename... Ls, typename R, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<std::tuple<Ls...>(LArgs...)> lhs, std::packaged_task<R(RArgs...)> rhs)
-    {
-        return std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>{
-#ifdef _MSC_VER
-            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)),
-                    rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](LArgs... largs, RArgs... rargs) {
-                auto& lhs = *lptr;
-                auto& rhs = *rptr;
-#else
-            [lhs = std::move(lhs) | then(as_tuple), rhs = std::move(rhs) | then(as_tuple)](LArgs... largs, RArgs... rargs) mutable {
-#endif
-                return std::tuple_cat(std::move(lhs) | get(std::move(largs)...),
-                                      std::move(rhs) | then(make_tuple) | get(std::move(rargs)...));
-            }
-        };
-    }
-}
-
-namespace parallel {
-    template<typename... Ls, typename R, typename... LArgs, typename... RArgs>
-    std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>
-        operator&(std::packaged_task<std::tuple<Ls...>(LArgs...)> lhs, std::packaged_task<R(RArgs...)> rhs)
-    {
-        return std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>{
-#ifdef _MSC_VER
-            [lptr = std::make_shared<decltype(lhs)>(std::move(lhs)),
-                    rptr = std::make_shared<decltype(rhs)>(std::move(rhs))](LArgs... largs, RArgs... rargs) {
-                auto& lhs = *lptr;
-                auto& rhs = *rptr;
-#else
-            [lhs = std::move(lhs, rhs](LArgs... largs, RArgs... rargs) mutable {
-#endif
-                auto rhs_as_tuple = std::move(rhs) | then(make_tuple);
-                auto lfuture = lhs.get_future();
-                auto rfuture = rhs_as_tuple.get_future();
-                auto lvoid = std::async(std::launch::async, std::move(lhs), std::move(largs)...);
-                auto rvoid = std::async(std::launch::async, std::move(rhs_as_tuple), std::move(rargs)...);
-                std::ignore = lvoid, rvoid;
-                return std::tuple_cat(lfuture.get(), rfuture.get());
-            }
-        };
-    }
 }
 
 }

@@ -4,7 +4,7 @@
 // https://www.boost.org/LICENSE_1_0.txt)
 #include <catch2/catch_test_macros.hpp>
 
-#include "monad/shared_task.h"
+#include "monad/task.h"
 #include <string>
 
 using namespace std::string_literals;
@@ -52,5 +52,82 @@ TEST_CASE("Test basic operations on shared_task")
         auto const shared = std::move(task) | share();
         shared("there.");
         CHECK(shared.get_future().get() == "Hello, there."s);
+    }
+}
+
+TEST_CASE("Test monadic operations on shared_task")
+{
+    using namespace sib::monad;
+    using namespace std::string_literals;
+
+    sib::shared_task<std::string()> const hello{[] { return "Hello"s; }};
+    sib::shared_task<std::string()> const world{[] { return "World!"s; }};
+    sib::shared_task<std::string(std::string const&)> const echo{[](std::string const& s) {
+        return s;
+    }};
+
+    SECTION("task | get()")
+    {
+        CHECK((hello | get()) == "Hello"s);
+    }
+
+    SECTION("task | get(...)")
+    {
+        CHECK((echo | get("World")) == "World"s);
+    }
+
+    SECTION("task | flatten()")
+    {
+        CHECK((hello | flatten() | get()) == "Hello"s);
+
+        sib::shared_task<sib::shared_task<std::string(std::string const&)>(unsigned int)> const task_of_task{
+            [](unsigned int n){
+                return sib::shared_task<std::string(std::string const&)>{[n](std::string const& s){
+                    std::string result = ""s;
+                    for(auto i = 0u; i < n; ++i)
+                        result += s;
+                    return result;
+                }};
+            }
+        };
+
+        auto flattened_task = task_of_task | flatten();
+        flattened_task("Hello"s, 2);
+        CHECK(flattened_task.get_future().get() == "HelloHello"s);
+    }
+
+    SECTION("when_any(task...)")
+    {
+        std::packaged_task<std::string()> hello_or_world = when_any(hello, world);
+        auto const result = std::move(hello_or_world) | get();
+        CHECK((result == "Hello"s || result == "world!"s));
+
+        auto hobsons_choice = in::parallel ^ hello ^ hello ^ hello ^ hello;
+        CHECK((std::move(hobsons_choice) | get()) == "Hello"s);
+    }
+
+    SECTION("when_any(task...) with exceptions")
+    {
+        sib::shared_task<std::string()> except{[]() -> std::string { throw std::runtime_error{"Exception!"}; }};
+
+        CHECK(((in::sequence ^ hello ^ except) | get()) == "Hello"s);
+        CHECK(((in::sequence ^ except ^ hello) | get()) == "Hello"s);
+        CHECK_THROWS_AS((in::sequence ^ except ^ except) | get(), std::runtime_error);
+    }
+
+    SECTION("task | then")
+    {
+        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
+    }
+
+    SECTION("task & task")
+    {
+        auto const merge = [](std::string const& x, std::string const& y) {
+            return x + ", "s + y;
+        };
+
+        CHECK(((in::parallel & hello & world) | apply(merge) | get()) == "Hello, World!"s);
+
+        CHECK((when_all(hello, world) | apply(merge) | get()) == "Hello, World!"s);
     }
 }

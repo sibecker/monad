@@ -18,6 +18,7 @@ TEST_CASE("Test monadic operations on std::optional")
     using sib::monad::when_all;
     using sib::monad::operator&;
     using sib::monad::apply;
+    using sib::monad::in;
 
     std::optional<int> opt = 42;
     std::optional<int> const copt = 27;
@@ -54,12 +55,12 @@ TEST_CASE("Test monadic operations on std::optional")
 
     SECTION("when_any(optional...)")
     {
-        CHECK(when_any(empty, opt, copt) != empty);
-        CHECK(when_any(empty, empty) == empty);
+        CHECK(when_any(empty, opt, copt)() != empty);
+        CHECK(when_any(empty, empty)() == empty);
 
         // operator^ is shorthand for when_any
-        CHECK((empty ^ opt) == opt);
-        CHECK(((copt ^ empty) | get()) == 27);
+        CHECK((in::sequence ^ empty ^ opt)() == opt);
+        CHECK(((in::parallel ^ copt ^ empty) | get()) == 27);
     }
 
     SECTION("optional | then(...)")
@@ -80,21 +81,23 @@ TEST_CASE("Test monadic operations on std::optional")
 
     SECTION("when_all(optional...) | apply(...)")
     {
-        static_assert(std::is_same_v<std::optional<std::tuple<int>>, decltype(when_all(opt))>);
-        static_assert(std::is_same_v<std::optional<std::tuple<int, int>>, decltype(when_all(opt, empty))>);
+        static_assert(std::is_convertible_v<decltype(when_all(opt)), std::optional<std::tuple<int>>>);
+        static_assert(std::is_convertible_v<decltype(when_all(opt, empty)), std::optional<std::tuple<int, int>>>);
 
         CHECK((when_all(opt, copt) | apply(std::plus<>{}) | get()) == 69);
 
-        // operator& is shorthand for when_all
-        using sib::monad::non_tuple::operator&;
-        CHECK(((opt & copt) | apply(std::plus<>{}) | get()) == 69);
+        // operator& is preferred to when_all
+        CHECK(((in::parallel & opt & copt) | apply(std::plus<>{}) | get()) == 69);
+
+        auto plus3 = [](auto x, auto y, auto z){ return x + y + z; };
+        CHECK((in::sequence & opt & empty & opt)() == std::nullopt);
+        CHECK(((in::sequence & opt & copt & opt) | apply(plus3) | get()) == 111);
     }
 
     SECTION("(((empty ^ opt) | then(f)) & copt) | apply(minus)")
     {
         // A complex expression using all the (public) monadic operations
-        using sib::monad::non_tuple::operator&;
-        CHECK(((((empty ^ opt) | then(f)) & copt) | apply(std::minus<>{}) | get()) == 57);
+        CHECK(((in::sequence & ((in::parallel ^ empty ^ opt) | then(f)) & copt) | apply(std::minus<>{}) | get()) == 57);
     }
 
 }

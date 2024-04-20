@@ -50,8 +50,7 @@ TEST_CASE("Test monadic operations on std::function")
         std::function<std::string()> const hello_or_world = when_any(hello, world);
         CHECK(((hello_or_world() == hello()) || (hello_or_world() == world())));
 
-        using sib::monad::parallel::operator^;
-        auto const hobsons_choice = hello ^ hello ^ hello ^ hello;
+        std::function<std::string()> const hobsons_choice = in::parallel ^ hello ^ hello ^ hello ^ hello;
         CHECK(hobsons_choice() == "Hello"s);
     }
 
@@ -59,10 +58,9 @@ TEST_CASE("Test monadic operations on std::function")
     {
         std::function<std::string()> const except = []() -> std::string { throw std::runtime_error{"Exception!"}; };
 
-        using sib::monad::parallel::operator^;
-        CHECK((hello ^ except)() == "Hello"s);
-        CHECK((except ^ hello)() == "Hello"s);
-        CHECK_THROWS_AS((except ^ except)(), std::runtime_error);
+        CHECK(((in::sequence ^ hello ^ except) | get()) == "Hello"s);
+        CHECK(((in::parallel ^ except ^ hello) | get()) == "Hello"s);
+        CHECK_THROWS_AS(((in::sequence ^ except ^ except) | get()), std::runtime_error);
     }
 
     SECTION("function | then(...)")
@@ -72,14 +70,13 @@ TEST_CASE("Test monadic operations on std::function")
 
     SECTION("function & function")
     {
-        auto const merge = [](std::string const& x, std::string const& y) {
-            return x + ", "s + y;
+        auto const merge = [](std::string const& x, std::string const& y, std::string const& z) {
+            return x + ", "s + y + ", "s + z;
         };
+        std::function<std::string()> there = []{ return "there"s; };
 
-        static_assert(std::is_same_v<std::function<std::tuple<std::string>()>, decltype(when_all(hello))>);
+        CHECK((when_all(hello, there, world) | apply(merge) | get()) == "Hello, there, World!"s);
 
-        using sib::monad::parallel::non_tuple::operator&;
-        CHECK(((hello & world) | apply(merge) | get()) == "Hello, World!"s);
-        CHECK((when_all(hello, world) | apply(merge) | get()) == "Hello, World!"s);
+        CHECK(((in::parallel & hello & there & world) | apply(merge) | get()) == "Hello, there, World!"s);
     }
 }

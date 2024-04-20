@@ -35,27 +35,27 @@ std::optional<T> operator|(std::optional<std::optional<T>> opt, Flatten)
 }
 
 template<typename T>
-std::optional<T> operator^(std::optional<T> const& lhs, std::optional<T> const& rhs)
+When<std::optional<T>> operator^(When<std::optional<T>> const& lhs, std::optional<T> const& rhs)
 {
-    return lhs ? lhs : rhs;
+    return {lhs.manner, lhs.value ? lhs.value : rhs};
 }
 
 template<typename T>
-std::optional<T> operator^(std::optional<T>&& lhs, std::optional<T> const& rhs)
+When<std::optional<T>> operator^(When<std::optional<T>>&& lhs, std::optional<T> const& rhs)
 {
-    return lhs ? std::move(lhs) : rhs;
+    return {lhs.manner, lhs.value ? std::move(lhs.value) : rhs};
 }
 
 template<typename T>
-std::optional<T> operator^(std::optional<T> const& lhs, std::optional<T>&& rhs)
+When<std::optional<T>> operator^(When<std::optional<T> const>& lhs, std::optional<T>&& rhs)
 {
-    return lhs ? lhs : std::move(rhs);
+    return {lhs.manner, lhs ? lhs : std::move(rhs)};
 }
 
 template<typename T>
-std::optional<T> operator^(std::optional<T>&& lhs, std::optional<T>&& rhs)
+When<std::optional<T>> operator^(When<std::optional<T>>&& lhs, std::optional<T>&& rhs)
 {
-    return lhs ? std::move(lhs) : std::move(rhs);
+    return {lhs.manner, lhs ? std::move(lhs) : std::move(rhs)};
 }
 
 template<typename T, typename Invokable>
@@ -69,12 +69,12 @@ auto operator|(std::optional<T> const& opt, Then<Invokable> const& f)
 }
 
 template<typename T, typename Invokable>
-auto operator|(std::optional<T>&& opt, Then<Invokable> const& f)
+auto operator|(std::optional<T>&& opt, Then<Invokable> const& th)
 {
-    using Result = decltype(std::invoke(f, *std::move(opt)));
+    using Result = decltype(std::invoke(th, std::move(opt) | get()));
     using Flattened = decltype(std::optional<Result>{} | flatten());
     return opt ?
-           std::optional<Result>{std::invoke(f, *std::move(opt))} | flatten() :
+           std::optional<Result>{std::invoke(th, std::move(opt) | get())} | flatten() :
            Flattened{std::nullopt};
 }
 
@@ -99,11 +99,12 @@ auto operator|(std::optional<T>&& opt, Then<Invokable>&& f)
 }
 
 template<typename... Ls, typename R>
-std::optional<std::tuple<Ls..., R>> operator&(std::optional<std::tuple<Ls...>> lhs, std::optional<R> rhs)
+When<std::optional<std::tuple<Ls..., R>>> operator&(When<std::optional<std::tuple<Ls...>>> lhs, std::optional<R> rhs)
 {
-    return lhs && rhs ?
+    return when_any(lhs.manner, lhs.value && rhs ?
         std::optional<std::tuple<Ls..., R>>{std::tuple_cat(lhs | get(), std::move(rhs) | then(make_tuple) | get())} :
-        std::optional<std::tuple<Ls..., R>>{};
+        std::optional<std::tuple<Ls..., R>>{}
+    );
 }
 
 }
