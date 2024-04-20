@@ -4,7 +4,7 @@
 // https://www.boost.org/LICENSE_1_0.txt)
 #include <catch2/catch_test_macros.hpp>
 
-#include "monad/task.h"
+#include "sib/monad/task.h"
 #include <string>
 
 TEST_CASE("Test monadic operations on std::packaged_task")

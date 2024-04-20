@@ -5,7 +5,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "monad/optional.h"
+#include "sib/monad/optional.h"
 
 TEST_CASE("Test monadic operations on std::optional")
 {

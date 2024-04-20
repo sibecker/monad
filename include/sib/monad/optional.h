@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "monad/monad.h"
+#include "sib/monad/monad.h"
 #include <optional>
 
 namespace sib::monad {

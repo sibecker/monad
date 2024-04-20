@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include "sib/monad/monad.h"
+#include "sib/shared_task.h"
 #include <array>
-#include "monad/shared_task.h"
-#include "monad/monad.h"
 
 namespace sib::monad {
 
