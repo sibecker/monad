@@ -101,7 +101,7 @@ When<std::optional<T>> operator^(When<std::optional<T>>&& lhs, std::optional<T>&
 template<typename... Ls, typename R>
 When<std::optional<std::tuple<Ls..., R>>> operator&(When<std::optional<std::tuple<Ls...>>> lhs, std::optional<R> rhs)
 {
-    return when_any(lhs.manner, lhs.value && rhs ?
+    return lhs.manner ^ (lhs.value && rhs ?
         std::optional<std::tuple<Ls..., R>>{std::tuple_cat(lhs | get(), std::move(rhs) | then(make_tuple) | get())} :
         std::optional<std::tuple<Ls..., R>>{}
     );

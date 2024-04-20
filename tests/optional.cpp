@@ -71,11 +71,11 @@ TEST_CASE("Test monadic operations on std::optional")
 
     SECTION("when_any(optional...)")
     {
-        CHECK(when_any(empty, opt, copt)() != empty);
-        CHECK(when_any(empty, empty)() == empty);
+        CHECK(when_any(empty, opt, copt) != empty);
+        CHECK(when_any(empty, empty) == empty);
 
         // operator^ is shorthand for when_any
-        CHECK((in::sequence ^ empty ^ opt)() == opt);
+        CHECK((in::sequence ^ empty ^ opt).value == opt);
         CHECK(((in::parallel ^ copt ^ empty) | get()) == 27);
     }
 
@@ -90,7 +90,7 @@ TEST_CASE("Test monadic operations on std::optional")
         CHECK(((in::parallel & opt & copt) | apply(std::plus<>{}) | get()) == 69);
 
         auto plus3 = [](auto x, auto y, auto z){ return x + y + z; };
-        CHECK((in::sequence & opt & empty & opt)() == std::nullopt);
+        CHECK((in::sequence & opt & empty & opt).value == std::nullopt);
         CHECK(((in::sequence & opt & copt & opt) | apply(plus3) | get()) == 111);
     }
 

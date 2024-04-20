@@ -127,48 +127,60 @@ struct When
 {
     in manner;
     T value;
-
-    /*implicit*/ operator T() && { return std::move(value); }
-    /*implicit*/ operator T() const& { return value; }
-
-    T& operator()() & { return value; }
-    T const& operator()() const& { return value; }
-    T&& operator()() && { return std::move(value); }
-    T const&& operator()() const&& { return std::move(value); }
 };
-template<typename T, typename Rhs>
-auto operator|(When<T>&& lhs, Rhs&& rhs) { return std::move(lhs.value) | std::forward<Rhs>(rhs); }
-template<typename T, typename Rhs>
-auto operator|(When<T> const& lhs, Rhs&& rhs) { return lhs.value | std::forward<Rhs>(rhs); }
-
-template<typename Tuple, typename Applicable>
-auto operator|(When<Tuple>&& when, Apply<Applicable>&& f)
-{
-    return std::move(when.value) | then(std::move(f));
-}
-
-template<typename Tuple, typename Applicable>
-auto operator|(When<Tuple> const& tuple, Apply<Applicable>&& f)
-{
-    return tuple.value | then(std::move(f));
-}
-
-template<typename Tuple, typename Applicable>
-auto operator|(When<Tuple>&& when, Apply<Applicable> const& f)
-{
-    return std::move(when.value) | then(f);
-}
-
-template<typename Tuple, typename Applicable>
-auto operator|(When<Tuple> const& tuple, Apply<Applicable> const& f)
-{
-    return tuple.value | then(f);
-}
-
 template<typename T>
 When<std::decay_t<T>> operator^(in manner, T&& value)
 {
     return {manner, std::forward<T>(value)};
+}
+
+template<typename T, typename... Args>
+auto operator|(When<T>&& when, Get<Args...>&& g)
+{
+    return std::move(when.value) | std::move(g);
+}
+
+template<typename T, typename... Args>
+auto operator|(When<T> const& when, Get<Args...>&& g)
+{
+    return when.value | std::move(g);
+}
+
+template<typename T, typename... Args>
+auto operator|(When<T>&& when, Get<Args...> const& g)
+{
+    return std::move(when.value) | g;
+}
+
+template<typename T, typename... Args>
+auto operator|(When<T> const& when, Get<Args...> const& g)
+{
+    return when.value | g;
+}
+
+template<typename T, typename Invocable>
+auto operator|(When<T>&& when, Then<Invocable>&& f)
+{
+    return std::move(when.value) | std::move(f);
+}
+
+template<typename T, typename Invocable>
+auto operator|(When<T> const& when, Then<Invocable>&& f)
+{
+    return when.value | std::move(f);
+}
+
+template<typename T, typename Invocable>
+auto operator|(When<T>&& when, Then<Invocable> const& f)
+{
+    return std::move(when.value) | f;
+
+}
+
+template<typename T, typename Invocable>
+auto operator|(When<T> const& when, Then<Invocable> const& f)
+{
+    return when.value | f;
 }
 
 template<typename Monad>
@@ -181,7 +193,7 @@ static inline constexpr struct {
     template<typename Head, typename... Tail>
     auto operator()(in manner, Head&& head, Tail&& ... tail) const
     {
-        return ((manner ^ std::forward<Head>(head)) ^ ... ^ std::forward<Tail>(tail));
+        return ((manner ^ std::forward<Head>(head)) ^ ... ^ std::forward<Tail>(tail)).value;
     }
 
     template<typename Head, typename... Tail>
@@ -195,7 +207,7 @@ static constexpr inline struct {
     template<typename Head, typename... Tail>
     auto operator()(in manner, Head&& head, Tail&& ... tail) const
     {
-        return ((manner & std::forward<Head>(head)) & ... & std::forward<Tail>(tail));
+        return ((manner & std::forward<Head>(head)) & ... & std::forward<Tail>(tail)).value;
     }
 
     template<typename Head, typename... Tail>

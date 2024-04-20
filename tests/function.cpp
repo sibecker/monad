@@ -55,8 +55,8 @@ TEST_CASE("Test monadic operations on std::function")
         std::function<std::string()> const hello_or_world = when_any(hello, world);
         CHECK(((hello_or_world() == hello()) || (hello_or_world() == world())));
 
-        std::function<std::string()> const hobsons_choice = in::parallel ^ hello ^ hello ^ hello ^ hello;
-        CHECK(hobsons_choice() == "Hello"s);
+        auto const hobsons_choice = in::parallel ^ hello ^ hello ^ hello ^ hello;
+        CHECK((hobsons_choice | get()) == "Hello"s);
     }
 
     SECTION("when_any(function...) with exceptions")

@@ -183,7 +183,7 @@ When<std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>>
                 auto& lhs = *lptr;
                 auto& rhs = *rptr;
 #else
-            [manner = lhs.manner, lhs = std::move(lhs.value), rhs = std::move(rhs)](Args... args) mutable {
+            [manner = lhs.manner, lhs = std::move(lhs.value), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) mutable {
 #endif
                 if (manner == in::sequence) {
                     return std::tuple_cat(std::move(lhs) | get(std::move(largs)...),

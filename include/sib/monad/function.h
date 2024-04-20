@@ -51,11 +51,11 @@ template<typename R, typename... Args>
 When<std::function<R(Args...)>> operator^(When<std::function<R(Args...)>> lhs, std::function<R(Args...)> rhs)
 {
     return {lhs.manner,
-            std::function<R(Args...)>{[lhs = std::move(lhs), rhs = std::move(rhs)](Args... args) {
-                std::packaged_task<R(Args...)> ltask{std::move(lhs.value)};
-                std::packaged_task<R(Args...)> rtask{std::move(rhs)};
-                return (lhs.manner ^ std::move(ltask) ^ std::move(rtask)) | get(std::move(args)...);
-            }}
+        std::function<R(Args...)>{[lhs = std::move(lhs), rhs = std::move(rhs)](Args... args) {
+            std::packaged_task<R(Args...)> ltask{std::move(lhs.value)};
+            std::packaged_task<R(Args...)> rtask{std::move(rhs)};
+            return (lhs.manner ^ std::move(ltask) ^ std::move(rtask)) | get(std::move(args)...);
+        }}
     };
 }
 
@@ -63,15 +63,14 @@ template<typename... Ls, typename R, typename... LArgs, typename... RArgs>
 When<std::function<std::tuple<Ls..., R>(LArgs..., RArgs...)>>
     operator&(When<std::function<std::tuple<Ls...>(LArgs...)>> lhs, std::function<R(RArgs...)> rhs)
 {
-    auto lambda = [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) -> std::tuple<Ls..., R> {
+    std::function<std::tuple<Ls..., R>(LArgs..., RArgs...)> lambda =
+            [lhs = std::move(lhs), rhs = std::move(rhs)](LArgs... largs, RArgs... rargs) {
+        in manner = lhs.manner;
         std::packaged_task<std::tuple<Ls...>(LArgs...)> ltask{std::move(lhs.value)};
         std::packaged_task<R(RArgs...)> rtask{std::move(rhs)};
-        auto combined_task = when_any(lhs.manner, std::move(ltask)) & std::move(rtask);
-        return std::move(combined_task) | get(std::move(largs)..., std::move(rargs)...);
+        return ((manner ^ std::move(ltask)) & std::move(rtask)) | get(std::move(largs)..., std::move(rargs)...);
     };
-    return {lhs.manner,
-        std::function<std::tuple<Ls..., R>(LArgs..., RArgs...)>{lambda}
-    };
+    return lhs.manner ^ std::move(lambda);
 }
 
 }
