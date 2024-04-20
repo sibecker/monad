@@ -53,16 +53,6 @@ TEST_CASE("Test monadic operations on std::optional")
         CHECK((copt_of_empty | flatten()) == empty);
     }
 
-    SECTION("when_any(optional...)")
-    {
-        CHECK(when_any(empty, opt, copt)() != empty);
-        CHECK(when_any(empty, empty)() == empty);
-
-        // operator^ is shorthand for when_any
-        CHECK((in::sequence ^ empty ^ opt)() == opt);
-        CHECK(((in::parallel ^ copt ^ empty) | get()) == 27);
-    }
-
     SECTION("optional | then(...)")
     {
         // then always returns by value, even if the callable returns a reference
@@ -77,6 +67,16 @@ TEST_CASE("Test monadic operations on std::optional")
 
         CHECK((copt | then(f) | get()) == 54);
         CHECK((empty | then(f)) == empty);
+    }
+
+    SECTION("when_any(optional...)")
+    {
+        CHECK(when_any(empty, opt, copt)() != empty);
+        CHECK(when_any(empty, empty)() == empty);
+
+        // operator^ is shorthand for when_any
+        CHECK((in::sequence ^ empty ^ opt)() == opt);
+        CHECK(((in::parallel ^ copt ^ empty) | get()) == 27);
     }
 
     SECTION("when_all(optional...) | apply(...)")

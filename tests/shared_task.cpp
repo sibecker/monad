@@ -8,6 +8,7 @@
 #include <string>
 
 using namespace std::string_literals;
+using namespace sib;
 using namespace sib::monad;
 
 TEST_CASE("Test basic operations on shared_task")
@@ -78,9 +79,7 @@ TEST_CASE("Test monadic operations on shared_task")
 
     SECTION("task | flatten()")
     {
-        CHECK((hello | flatten() | get()) == "Hello"s);
-
-        sib::shared_task<sib::shared_task<std::string(std::string const&)>(unsigned int)> const task_of_task{
+        std::packaged_task<sib::shared_task<std::string(std::string const&)>(unsigned int)> task_of_task{
             [](unsigned int n){
                 return sib::shared_task<std::string(std::string const&)>{[n](std::string const& s){
                     std::string result = ""s;
@@ -91,9 +90,14 @@ TEST_CASE("Test monadic operations on shared_task")
             }
         };
 
-        auto flattened_task = task_of_task | flatten();
+        auto flattened_task = std::move(task_of_task) | flatten();
         flattened_task("Hello"s, 2);
         CHECK(flattened_task.get_future().get() == "HelloHello"s);
+    }
+
+    SECTION("task | then")
+    {
+        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
     }
 
     SECTION("when_any(task...)")
@@ -113,11 +117,6 @@ TEST_CASE("Test monadic operations on shared_task")
         CHECK(((in::sequence ^ hello ^ except) | get()) == "Hello"s);
         CHECK(((in::sequence ^ except ^ hello) | get()) == "Hello"s);
         CHECK_THROWS_AS((in::sequence ^ except ^ except) | get(), std::runtime_error);
-    }
-
-    SECTION("task | then")
-    {
-        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
     }
 
     SECTION("task & task")

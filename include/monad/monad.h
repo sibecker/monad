@@ -47,34 +47,34 @@ static inline constexpr struct {
     }
 } flatten;
 
-template<typename Invokable>
+template<typename Invocable>
 class Then
 {
 private:
-    Invokable invokable;
+    Invocable invocable;
 
 public:
-    explicit Then(Invokable callable)
-        : invokable{std::move(callable)}
+    explicit Then(Invocable callable)
+        : invocable{std::move(callable)}
     {}
 
     template<typename... Args>
     auto operator()(Args&&... args) const &
     {
-        return std::invoke(invokable, std::forward<Args>(args)...);
+        return std::invoke(invocable, std::forward<Args>(args)...);
     }
 
     template<typename... Args>
     auto operator()(Args&&... args) &&
     {
-        return std::invoke(std::move(invokable), std::forward<Args>(args)...);
+        return std::invoke(std::move(invocable), std::forward<Args>(args)...);
     }
 };
 static constexpr inline struct {
-    template<typename Invokable>
-    Then<std::decay_t<Invokable>> operator()(Invokable&& invokable) const
+    template<typename Invocable>
+    Then<std::decay_t<Invocable>> operator()(Invocable&& invocable) const
     {
-        return Then<std::decay_t<Invokable>>{std::forward<Invokable>(invokable)};
+        return Then<std::decay_t<Invocable>>{std::forward<Invocable>(invocable)};
     }
 } then;
 
@@ -110,15 +110,15 @@ static constexpr inline struct {
 } apply;
 
 template<typename Tuple, typename Applicable>
-auto operator|(Tuple&& tuple, Apply<Applicable> const& apply)
+auto operator|(Tuple&& tuple, Apply<Applicable> const& f)
 {
-    return std::forward<Tuple>(tuple) | then(apply);
+    return std::forward<Tuple>(tuple) | then(f);
 }
 
 template<typename Tuple, typename Applicable>
-auto operator|(Tuple&& tuple, Apply<Applicable>&& apply)
+auto operator|(Tuple&& tuple, Apply<Applicable>&& f)
 {
-    return std::forward<Tuple>(tuple) | then(std::move(apply));
+    return std::forward<Tuple>(tuple) | then(std::move(f));
 }
 
 enum class in : bool { sequence = false, parallel = true };
@@ -142,27 +142,27 @@ template<typename T, typename Rhs>
 auto operator|(When<T> const& lhs, Rhs&& rhs) { return lhs.value | std::forward<Rhs>(rhs); }
 
 template<typename Tuple, typename Applicable>
-auto operator|(When<Tuple>&& when, Apply<Applicable>&& apply)
+auto operator|(When<Tuple>&& when, Apply<Applicable>&& f)
 {
-    return std::move(when.value) | then(std::move(apply));
+    return std::move(when.value) | then(std::move(f));
 }
 
 template<typename Tuple, typename Applicable>
-auto operator|(When<Tuple> const& tuple, Apply<Applicable>&& apply)
+auto operator|(When<Tuple> const& tuple, Apply<Applicable>&& f)
 {
-    return tuple.value | then(std::move(apply));
+    return tuple.value | then(std::move(f));
 }
 
 template<typename Tuple, typename Applicable>
-auto operator|(When<Tuple>&& when, Apply<Applicable> const& apply)
+auto operator|(When<Tuple>&& when, Apply<Applicable> const& f)
 {
-    return std::move(when.value) | then(apply);
+    return std::move(when.value) | then(f);
 }
 
 template<typename Tuple, typename Applicable>
-auto operator|(When<Tuple> const& tuple, Apply<Applicable> const& apply)
+auto operator|(When<Tuple> const& tuple, Apply<Applicable> const& f)
 {
-    return tuple.value | then(apply);
+    return tuple.value | then(f);
 }
 
 template<typename T>

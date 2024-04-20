@@ -45,6 +45,11 @@ TEST_CASE("Test monadic operations on std::function")
         CHECK((fun_of_fun | flatten())("Hello", 2) == "HelloHello"s);
     }
 
+    SECTION("function | then(...)")
+    {
+        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
+    }
+
     SECTION("when_any(function...)")
     {
         std::function<std::string()> const hello_or_world = when_any(hello, world);
@@ -61,11 +66,6 @@ TEST_CASE("Test monadic operations on std::function")
         CHECK(((in::sequence ^ hello ^ except) | get()) == "Hello"s);
         CHECK(((in::parallel ^ except ^ hello) | get()) == "Hello"s);
         CHECK_THROWS_AS(((in::sequence ^ except ^ except) | get()), std::runtime_error);
-    }
-
-    SECTION("function | then(...)")
-    {
-        CHECK((hello | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
     }
 
     SECTION("function & function")

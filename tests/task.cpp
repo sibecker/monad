@@ -48,6 +48,13 @@ TEST_CASE("Test monadic operations on std::packaged_task")
         CHECK(flattened_task.get_future().get() == "HelloHello"s);
     }
 
+    SECTION("task | then")
+    {
+        std::packaged_task<std::string()> hello{[] { return "Hello"s; }};
+
+        CHECK((std::move(hello) | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
+    }
+
     SECTION("when_any(task...)")
     {
         std::packaged_task <std::string()> hello{[] { return "Hello"s; }};
@@ -79,13 +86,6 @@ TEST_CASE("Test monadic operations on std::packaged_task")
         CHECK(((in::parallel ^ std::move(hello1) ^ std::move(except1)) | get()) == "Hello"s);
         CHECK(((in::parallel ^ std::move(except2) ^ std::move(hello2)) | get()) == "Hello"s);
         CHECK_THROWS_AS((in::parallel ^ std::move(except3) ^ std::move(except4)) | get(), std::runtime_error);
-    }
-
-    SECTION("task | then")
-    {
-        std::packaged_task<std::string()> hello{[] { return "Hello"s; }};
-
-        CHECK((std::move(hello) | then([](auto const& s){ return s + ", World!"s; }) | get()) == "Hello, World!");
     }
 
     SECTION("task & task")

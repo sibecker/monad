@@ -34,6 +34,46 @@ std::optional<T> operator|(std::optional<std::optional<T>> opt, Flatten)
     return std::move(opt).value_or(std::nullopt);
 }
 
+template<typename T, typename Invocable>
+auto operator|(std::optional<T> const& opt, Then<Invocable> const& f)
+{
+    using Result = decltype(std::invoke(f, *opt));
+    using Flattened = decltype(std::optional<Result>{} | flatten());
+    return opt ?
+        std::optional<Result>{std::invoke(f, *opt)} | flatten() :
+        Flattened{std::nullopt};
+}
+
+template<typename T, typename Invocable>
+auto operator|(std::optional<T>&& opt, Then<Invocable> const& f)
+{
+    using Result = decltype(std::invoke(f, std::move(opt) | get()));
+    using Flattened = decltype(std::optional<Result>{} | flatten());
+    return opt ?
+           std::optional<Result>{std::invoke(f, std::move(opt) | get())} | flatten() :
+           Flattened{std::nullopt};
+}
+
+template<typename T, typename Invocable>
+auto operator|(std::optional<T> const& opt, Then<Invocable>&& f)
+{
+    using Result = decltype(std::invoke(std::move(f), *opt));
+    using Flattened = decltype(std::optional<Result>{} | flatten());
+    return opt ?
+           std::optional<Result>{std::invoke(std::move(f), *opt)} | flatten() :
+           Flattened{std::nullopt};
+}
+
+template<typename T, typename Invocable>
+auto operator|(std::optional<T>&& opt, Then<Invocable>&& f)
+{
+    using Result = decltype(std::invoke(std::move(f), *std::move(opt)));
+    using Flattened = decltype(std::optional<Result>{} | flatten());
+    return opt ?
+           std::optional<Result>{std::invoke(std::move(f), *std::move(opt))} | flatten() :
+           Flattened{std::nullopt};
+}
+
 template<typename T>
 When<std::optional<T>> operator^(When<std::optional<T>> const& lhs, std::optional<T> const& rhs)
 {
@@ -56,46 +96,6 @@ template<typename T>
 When<std::optional<T>> operator^(When<std::optional<T>>&& lhs, std::optional<T>&& rhs)
 {
     return {lhs.manner, lhs ? std::move(lhs) : std::move(rhs)};
-}
-
-template<typename T, typename Invokable>
-auto operator|(std::optional<T> const& opt, Then<Invokable> const& f)
-{
-    using Result = decltype(std::invoke(f, *opt));
-    using Flattened = decltype(std::optional<Result>{} | flatten());
-    return opt ?
-        std::optional<Result>{std::invoke(f, *opt)} | flatten() :
-        Flattened{std::nullopt};
-}
-
-template<typename T, typename Invokable>
-auto operator|(std::optional<T>&& opt, Then<Invokable> const& th)
-{
-    using Result = decltype(std::invoke(th, std::move(opt) | get()));
-    using Flattened = decltype(std::optional<Result>{} | flatten());
-    return opt ?
-           std::optional<Result>{std::invoke(th, std::move(opt) | get())} | flatten() :
-           Flattened{std::nullopt};
-}
-
-template<typename T, typename Invokable>
-auto operator|(std::optional<T> const& opt, Then<Invokable>&& f)
-{
-    using Result = decltype(std::invoke(std::move(f), *opt));
-    using Flattened = decltype(std::optional<Result>{} | flatten());
-    return opt ?
-           std::optional<Result>{std::invoke(std::move(f), *opt)} | flatten() :
-           Flattened{std::nullopt};
-}
-
-template<typename T, typename Invokable>
-auto operator|(std::optional<T>&& opt, Then<Invokable>&& f)
-{
-    using Result = decltype(std::invoke(std::move(f), *std::move(opt)));
-    using Flattened = decltype(std::optional<Result>{} | flatten());
-    return opt ?
-           std::optional<Result>{std::invoke(std::move(f), *std::move(opt))} | flatten() :
-           Flattened{std::nullopt};
 }
 
 template<typename... Ls, typename R>

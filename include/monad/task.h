@@ -5,21 +5,37 @@
 
 #pragma once
 
+#include <array>
 #include "monad/shared_task.h"
+#include "monad/monad.h"
 
 namespace sib::monad {
 
 template<typename R, typename... Args, typename... GArgs>
-R operator|(std::packaged_task<R(Args...)> task, Get<GArgs...>&& get)
+R operator|(std::packaged_task<R(Args...)> task, Get<GArgs...>&& g)
 {
-    std::apply(task, std::move(get.args));
+    std::apply(task, std::move(g.args));
     return task.get_future().get();
 }
 
 template<typename R, typename... Args, typename... GArgs>
-R operator|(std::packaged_task<R(Args...)> task, Get<GArgs...> const& get)
+R operator|(std::packaged_task<R(Args...)> task, Get<GArgs...> const& g)
 {
-    std::apply(task, get.args);
+    std::apply(task, g.args);
+    return task.get_future().get();
+}
+
+template<typename R, typename... Args, typename... GArgs>
+R operator|(shared_task<R(Args...)> const& task, Get<GArgs...>&& g)
+{
+    std::apply(task, std::move(g.args));
+    return task.get_future().get();
+}
+
+template<typename R, typename... Args, typename... GArgs>
+R operator|(shared_task<R(Args...)> const& task, Get<GArgs...> const& g)
+{
+    std::apply(task, g.args);
     return task.get_future().get();
 }
 
@@ -47,10 +63,53 @@ std::packaged_task<R(InnerArgs..., OuterArgs...)>
     };
 }
 
-template<typename R, typename... Args>
-When<std::packaged_task<R(Args...)>> operator^(in manner, std::packaged_task<R(Args...)> task)
+template<typename R, typename... InnerArgs, typename... OuterArgs>
+std::packaged_task<R(InnerArgs..., OuterArgs...)>
+    operator|(std::packaged_task<shared_task<R(InnerArgs...)>(OuterArgs...)> task, Flatten)
 {
-    return {manner, std::move(task)};
+    return std::packaged_task<R(InnerArgs..., OuterArgs...)>{
+#ifdef _MSC_VER
+        // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
+        // See https://github.com/microsoft/STL/issues/321
+        [ptr = std::make_shared<decltype(task)>(std::move(task))](InnerArgs... innerArgs, OuterArgs... outerArgs) {
+         auto& task = *ptr;
+#else
+        [task = std::move(task)](InnerArgs... innerArgs, OuterArgs... outerArgs) mutable {
+#endif
+            return std::move(task) | get(std::move(outerArgs)...) | get(std::move(innerArgs)...);
+        }
+    };
+}
+
+template<typename R, typename... Args, typename Invocable>
+auto operator|(std::packaged_task<R(Args...)> task, Then<Invocable> f)
+{
+    using Result = std::invoke_result_t<Invocable, R>;
+    return std::packaged_task<Result(Args...)> {
+#ifdef _MSC_VER
+        // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
+        // See https://github.com/microsoft/STL/issues/321
+        [task_ptr = std::make_shared<decltype(task)>(std::move(task)),
+         then_ptr = std::make_shared<decltype(f)>(std::move(f))] (Args... args) {
+            auto& task = *task_ptr;
+            auto& f = *then_ptr;
+#else
+        [task = std::move(task), f = std::move(f)] mutable (Args... args) {
+#endif
+            return std::move(f)(std::move(task) | get(std::move(args)...));
+        }
+    } | flatten();
+}
+
+template<typename R, typename... Args, typename Invocable>
+auto operator|(shared_task<R(Args...)> task, Then<Invocable> f)
+{
+    using Result = std::invoke_result_t<Invocable, R>;
+    return std::packaged_task<Result(Args...)> {
+            [task = std::move(task), f = std::move(f)] (Args... args) {
+                return f(task | get(std::move(args)...));
+            }
+    } | flatten();
 }
 
 template<typename R, typename... Args>
@@ -97,24 +156,16 @@ When<std::packaged_task<R(Args...)>> operator^(When<std::packaged_task<R(Args...
     };
 }
 
-template<typename R, typename... Args, typename Invokable>
-auto operator|(std::packaged_task<R(Args...)> task, Then<Invokable> then)
+template<typename R, typename... Args>
+When<std::packaged_task<R(Args...)>> operator^(in manner, shared_task<R(Args...)> task)
 {
-    using Result = std::invoke_result_t<Invokable, R>;
-    return std::packaged_task<Result(Args...)> {
-#ifdef _MSC_VER
-        // Capture by shared_ptr to work round bug in MSVC where packaged_task can't construct from a mutable lambda.
-        // See https://github.com/microsoft/STL/issues/321
-        [task_ptr = std::make_shared<decltype(task)>(std::move(task)),
-         then_ptr = std::make_shared<decltype(then)>(std::move(then))] (Args... args) {
-            auto& task = *task_ptr;
-            auto& then = *then_ptr;
-#else
-        [task = std::move(task), then = std::move(then)] mutable (Args... args) {
-#endif
-            return std::move(then)(std::move(task) | get(std::move(args)...));
-        }
-    } | flatten();
+    return manner ^ (std::move(task) | then(identity));
+}
+
+template<typename R, typename... Args>
+When<std::packaged_task<R(Args...)>> operator^(When<std::packaged_task<R(Args...)>> lhs, shared_task<R(Args...)> rhs)
+{
+    return std::move(lhs) ^ (std::move(rhs) | then(identity));
 }
 
 template<typename... Ls, typename R, typename... LArgs, typename... RArgs>
@@ -149,6 +200,19 @@ When<std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>>
             }
         }
     };
+}
+
+template<typename R, typename... Args>
+When<std::packaged_task<std::tuple<R>(Args...)>> operator&(in manner, shared_task<R(Args...)> task)
+{
+    return manner & (std::move(task) | then(identity));
+}
+
+template<typename... Ls, typename R, typename... LArgs, typename... RArgs>
+When<std::packaged_task<std::tuple<Ls..., R>(LArgs..., RArgs...)>>
+operator&(When<std::packaged_task<std::tuple<Ls...>(LArgs...)>> lhs, shared_task<R(RArgs...)> rhs)
+{
+    return std::move(lhs) & (std::move(rhs) | then(identity));
 }
 
 }
