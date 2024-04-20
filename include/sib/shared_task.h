@@ -14,6 +14,11 @@ namespace sib {
 template<typename Signature>
 class shared_task;
 
+/*
+ * shared_task is to packaged_task what shared_future is to future.
+ * i.e. it exposes the same essential functionality, but through a const interface, and the task is copyable.
+ * Furthermore, copies of a shared_task share a common state.
+ */
 template<typename R, typename... Args>
 class shared_task<R(Args...)> {
 private:
@@ -32,7 +37,7 @@ private:
     std::shared_ptr<Impl const> impl;
 
 public:
-    // We want a class invariant that impl is never null, so we have to customise move operations.
+    // We give a class invariant that impl is never null, so we have to customise move operations.
     // Move operations should leave the rhs in a valid state.
     // Here we have move construction being identical to copy, but move assignment is a swap.
 
@@ -55,16 +60,25 @@ public:
 
     shared_task& operator=(shared_task const&) noexcept = default;
 
-    // IMPLICIT construction from a packaged_task ...
+    /*
+     * IMPLICIT construction from a packaged_task ...
+     * It is UB to pass a task that has had either its call operator invoked or its future fetched.
+     */
     /*implicit*/ shared_task(std::packaged_task<R(Args...)> task) :
         impl{std::make_shared<Impl>(std::move(task))}
     {}
 
-    // ... but EXPLICIT from anything else (e.g. a lambda, std::function etc.)
+    /*
+     * ... but EXPLICIT from anything else (e.g. a lambda, std::function etc.)
+     */
     template<typename Callable>
     explicit shared_task(Callable&& callable) :
         impl{nullptr}
     {
+        // We'd like to take any callable, but packaged_task sometimes doesn't like it.
+        // For the cases that *should* work (but don't), we wrap into a shared_ptr first to break constness.
+        // Since the underlying packaged_task is move-only, the ref-count will be none, so we lose no safety
+        // by breaking constness this way.
         if constexpr(std::is_copy_constructible_v<std::decay_t<Callable>> &&
                 std::is_copy_assignable_v<std::decay_t<Callable>> &&
                 std::is_invocable_r_v<R, std::decay_t<Callable> const, Args...>) {
@@ -78,6 +92,13 @@ public:
         }
     }
 
+    /*
+     * Calling a shared_task will invoke the underlyinging packaged task on the first call
+     * But subsequent calls (including from other threads) will reuse the same value from before
+     * - even if different arguments are supplied.
+     *
+     * In either case, the call will not return until the future is ready.
+     */
     void operator()(Args... args) const
     {
         if (impl->flag.test_and_set()) {
@@ -93,6 +114,11 @@ public:
     }
 };
 
+/*
+ * The Share tag class, share anonymous factory object and pipe operator work together to give us the syntax
+ * task|share() to creating a shared_task from a packaged_task.
+ * This is as close as we can get to the syntax task.share() from outside.
+ */
 class Share{};
 static inline constexpr struct {
     Share operator()() const {
